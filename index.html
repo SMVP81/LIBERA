@@ -493,7 +493,7 @@
   table.cf-table th { text-align: left; background: #0A2545; color: #fff; padding: 7px 9px; font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase; }
   table.cf-table td { padding: 6px 9px; border-bottom: 1px solid #EEE6CC; vertical-align: middle; }
   table.cf-table tr:nth-child(even) td { background: #FBF9F2; }
-  table.cf-table td.num, table.cf-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.cf-table td.num, table.cf-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; }
   table.cf-table tr.clickable { cursor: pointer; }
   table.cf-table tr.clickable:hover td { background: #F4EBD3; }
   table.cf-table td.rm { width: 26px; text-align: center; padding: 0; }
@@ -2168,10 +2168,21 @@
     if (p.estado === 'Vendido' && p.fecha_venta) return p.fecha_venta;
     return new Date().toISOString().slice(0, 10);
   }
+  // El interés se calcula solo (ver cfFechaFinInteres), pero si el banco/el
+  // prestamista te dio un monto exacto distinto al aproximado, puedes
+  // corregirlo a mano por préstamo (pr.interes_manual) — mientras esté
+  // seteado, ese valor manda en vez del cálculo automático. Bórralo (queda
+  // vacío) para volver al cálculo automático.
   function cfInteresPrestamo(p, pr) {
+    if (pr.interes_manual !== undefined && pr.interes_manual !== null && pr.interes_manual !== '') {
+      return Number(pr.interes_manual) || 0;
+    }
     const fin = cfFechaFinInteres(p, pr);
     const meses = cfMesesEntre(pr.fecha, fin);
     return (Number(pr.monto) || 0) * ((Number(pr.tasa) || 0) / 100) * (meses / 12);
+  }
+  function cfInteresEsManual(pr) {
+    return pr.interes_manual !== undefined && pr.interes_manual !== null && pr.interes_manual !== '';
   }
   function cfInteresesCalculados(p) {
     return (p.prestamos || []).reduce((sum, pr) => sum + cfInteresPrestamo(p, pr), 0);
@@ -2842,15 +2853,46 @@
         const saldo = cfSaldoPrestamo(pr);
         const interes = cfInteresPrestamo(p, pr);
         const finInteres = cfFechaFinInteres(p, pr);
+        const esManual = cfInteresEsManual(pr);
+        const interesTitle = esManual ? 'Ajustado a mano — borra el valor para volver al cálculo automático' : ('Calculado solo: desde ' + (pr.fecha || '') + ' hasta ' + finInteres);
         rows += '<tr><td>' + escapeHtml(pr.prestamistas) + '</td><td>' + escapeHtml(p.nombre) + '</td>' +
           '<td class="num">' + cfFmt(pr.monto) + '</td><td class="num">' + pr.tasa + '%</td><td class="num">' + cfFmt(saldo) + '</td>' +
-          '<td class="num" title="Calculado desde ' + escapeHtml(pr.fecha || '') + ' hasta ' + escapeHtml(finInteres) + '">' + cfFmt(interes) + '</td>' +
+          '<td class="num" title="' + escapeHtml(interesTitle) + '">' +
+            '<span style="display:inline-flex; align-items:center; gap:4px; justify-content:flex-end;">' +
+              (esManual ? '<span class="cf-pill muted" style="font-size:8.5px; padding:2px 6px;">manual</span>' : '') +
+              '<input class="cf-est-input" style="width:88px;" type="text" value="' + formatAmt(interes) + '" onchange="cfCambiarInteresManual(\'' + p.id + '\', \'' + pr.id + '\', this.value)" />' +
+              (esManual ? '<button class="cf-rm-btn" title="Volver al cálculo automático" onclick="cfCambiarInteresManual(\'' + p.id + '\', \'' + pr.id + '\', \'\')">↺</button>' : '') +
+            '</span>' +
+          '</td>' +
           '<td>' + (saldo <= 0 ? '<span class="cf-pill ok">Pagado</span>' : '<span class="cf-pill warn">Vigente</span>') + '</td>' +
           '<td><button class="btn btn-outline cf-btn-sm" onclick="cfAbrirPago(\'' + p.id + '\',\'' + pr.id + '\')" ' + (saldo <= 0 ? 'disabled' : '') + '>+ Pago</button></td></tr>';
       });
     });
     if (!any) rows += '<tr><td colspan="8" style="color:#97A2B0; font-style:italic;">Sin préstamos registrados todavía.</td></tr>';
     document.getElementById('cfPrestamosTable').innerHTML = rows;
+  }
+  // Ajuste manual del interés de un préstamo puntual — por si el banco o el
+  // prestamista te dieron un monto exacto distinto al que calcula la fórmula
+  // (monto × tasa × meses). Vaciar el campo (o darle al ↺) borra el ajuste y
+  // vuelve a calcularlo solo.
+  async function cfCambiarInteresManual(proyectoId, prestamoId, val) {
+    const p = cfProyectos.find(x => x.id === proyectoId);
+    if (!p) return;
+    const esBorrar = val === null || val === undefined || String(val).trim() === '';
+    const num = esBorrar ? null : parseNum(val);
+    const valorFinal = (!esBorrar && (num === null || isNaN(num))) ? null : num;
+    const prestamos = (p.prestamos || []).map(pr => pr.id === prestamoId ? { ...pr, interes_manual: valorFinal } : pr);
+    p.prestamos = prestamos;
+    try {
+      await cfPersistProyecto(proyectoId, { prestamos });
+      cfRenderPrestamos();
+      if (cfCurrentProyectoId === proyectoId) cfRenderDetalle();
+      cfRenderResumen();
+      showToast(valorFinal === null ? 'Interés vuelto a cálculo automático' : 'Interés ajustado a mano ✓');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo actualizar el interés.');
+    }
   }
   function cfAbrirNuevoPrestamo() {
     if (!cfProyectos.length) { showToast('Crea al menos un proyecto primero.'); return; }
