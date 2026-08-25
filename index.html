@@ -2898,6 +2898,23 @@
       showToast('No se pudo actualizar el interés.');
     }
   }
+  // La mayoría de préstamos financian justo el "Total inversión para la
+  // venta (VTA)" real del proyecto (lo que ya se ha gastado según la
+  // bitácora) — así que se sugiere ese monto al crear un préstamo nuevo,
+  // pero apenas el usuario lo edita a mano deja de auto-actualizarse (por
+  // si el préstamo fue por otra cifra, o el proyecto todavía no tiene
+  // gastos cargados).
+  function cfSugerenciaMontoPrestamo(proyectoId) {
+    const p = cfProyectos.find(x => x.id === proyectoId);
+    return p ? cfUtilidadProyecto(p).vtaReal : 0;
+  }
+  function cfSugerirMontoPrestamo() {
+    const montoInput = document.getElementById('cfPrestamoMonto');
+    if (!montoInput || montoInput.dataset.auto !== '1') return;
+    const proyectoId = document.getElementById('cfPrestamoProyecto').value;
+    const sugerido = cfSugerenciaMontoPrestamo(proyectoId);
+    montoInput.value = sugerido ? formatAmt(sugerido) : '';
+  }
   function cfAbrirNuevoPrestamo() {
     if (!cfProyectos.length) { showToast('Crea al menos un proyecto primero.'); return; }
     const overlay = document.createElement('div');
@@ -2906,16 +2923,19 @@
     overlay.onclick = (e) => { if (e.target === overlay) cfClosePrestamoModal(); };
     const modal = document.createElement('div');
     modal.className = 'pipeline-modal';
-    const proyOpts = cfProyectos.map(p => '<option value="' + p.id + '">' + escapeHtml(p.nombre) + '</option>').join('');
+    const proyectoInicial = (cfCurrentProyectoId && cfProyectos.some(x => x.id === cfCurrentProyectoId)) ? cfCurrentProyectoId : cfProyectos[0].id;
+    const proyOpts = cfProyectos.map(p => '<option value="' + p.id + '"' + (p.id === proyectoInicial ? ' selected' : '') + '>' + escapeHtml(p.nombre) + '</option>').join('');
+    const montoSugerido = cfSugerenciaMontoPrestamo(proyectoInicial);
     modal.innerHTML =
       '<h3>Nuevo préstamo</h3>' +
-      '<div class="field"><label>Proyecto</label><select id="cfPrestamoProyecto">' + proyOpts + '</select></div>' +
+      '<div class="field"><label>Proyecto</label><select id="cfPrestamoProyecto" onchange="cfSugerirMontoPrestamo()">' + proyOpts + '</select></div>' +
       '<div class="field"><label>Prestamista(s)</label><input type="text" id="cfPrestamoPrestamistas" placeholder="ej. Yayo, Samuel" /></div>' +
       '<div class="field-row">' +
-        '<div class="field"><label>Monto</label><input type="text" id="cfPrestamoMonto" placeholder="0.00" /></div>' +
+        '<div class="field"><label>Monto</label><input type="text" id="cfPrestamoMonto" data-auto="1" oninput="this.dataset.auto=\'0\'" value="' + (montoSugerido ? formatAmt(montoSugerido) : '') + '" placeholder="0.00" /></div>' +
         '<div class="field"><label>Tasa anual (%)</label><input type="text" id="cfPrestamoTasa" placeholder="5" /></div>' +
       '</div>' +
       '<div class="field"><label>Fecha de inicio</label><input type="date" id="cfPrestamoFecha" /></div>' +
+      (montoSugerido ? '<div class="cf-note" style="margin-top:2px; font-size:10.5px;">Monto sugerido = Total inversión para la venta (VTA) real del proyecto. Cámbialo si el préstamo fue por otra cifra.</div>' : '') +
       '<div class="modal-actions"><button class="btn btn-outline" onclick="cfClosePrestamoModal()">Cancelar</button><button class="btn btn-gold" onclick="cfCrearPrestamo()">Guardar préstamo</button></div>';
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
