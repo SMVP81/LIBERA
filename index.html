@@ -2205,7 +2205,7 @@
     const vtaReal = compraReal + gCompraReal + gPostReal;
     const precioVenta = Number(p.est_precio_venta) || 0;
     const agenteReal = precioVenta * ((Number(p.est_agente_pct) || 0) / 100);
-    const impuestoReal = (precioVenta - vtaReal) * ((Number(p.est_impuesto_pct) || 0) / 100);
+    const impuestoReal = (precioVenta - compraReal) * ((Number(p.est_impuesto_pct) || 0) / 100);
     const interesesReal = cfInteresesCalculados(p);
     const utilidadNeta = precioVenta - agenteReal - impuestoReal - interesesReal - vtaReal;
     const rentNeta = precioVenta ? utilidadNeta / precioVenta : 0;
@@ -2520,7 +2520,7 @@
     const estimadaVTA = (Number(p.est_compra) || 0) + (Number(p.est_gastos_compra) || 0) + (Number(p.est_gastos_post) || 0);
     const precioVenta = Number(p.est_precio_venta) || 0;
     const estAgente = precioVenta * ((Number(p.est_agente_pct) || 0) / 100);
-    const estImpuesto = (precioVenta - estimadaVTA) * ((Number(p.est_impuesto_pct) || 0) / 100);
+    const estImpuesto = (precioVenta - (Number(p.est_compra) || 0)) * ((Number(p.est_impuesto_pct) || 0) / 100);
     const estUtilidad = precioVenta - estAgente - estImpuesto - estimadaVTA;
 
     titEl.innerHTML = '<span>' + escapeHtml(p.nombre) + '</span>' +
