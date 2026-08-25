@@ -2037,6 +2037,10 @@
   let cfProyectos = [];
   let cfTiposCambio = [];
   let cfFichaLabels = {}; // ficha_id -> triang_id, para no volver a pedir cada Ficha solo por su código
+  // ficha_id -> valores "Estimado" calculados AHORA MISMO en esa Ficha —
+  // se usa solo para avisar si difieren de lo guardado en el proyecto (ver
+  // cfEstimadoDesactualizado), no para sobreescribir nada solo.
+  let cfFichaEstimadosCache = {};
   let cfCurrentProyectoId = null;
   let cfCurrentTab = 'resumen';
   let cfEditingGasto = null;
@@ -2078,12 +2082,28 @@
   async function cfLoadFichaLabels() {
     const ids = [...new Set(cfProyectos.filter(p => p.ficha_id).map(p => p.ficha_id))];
     cfFichaLabels = {};
+    cfFichaEstimadosCache = {};
     await Promise.all(ids.map(async id => {
       try {
         const f = await db.getFicha(id);
-        if (f) cfFichaLabels[id] = f.triang_id || '(sin código)';
+        if (f) {
+          cfFichaLabels[id] = f.triang_id || '(sin código)';
+          cfFichaEstimadosCache[id] = fichaValoresEstimados(f);
+        }
       } catch (err) { console.error(err); }
     }));
+  }
+
+  // ¿Los valores "Estimado" guardados en el proyecto ya no coinciden con lo
+  // que la Ficha vinculada calcula ahora mismo? (p.ej. alguien siguió
+  // ajustando la Ficha después de vincularla). Los montos se comparan con
+  // un margen de S/ 0.5 para no disparar el aviso por puro redondeo.
+  function cfEstimadoDesactualizado(p) {
+    if (!p.ficha_id) return false;
+    const v = cfFichaEstimadosCache[p.ficha_id];
+    if (!v) return false;
+    const campos = ['est_compra', 'est_gastos_compra', 'est_gastos_post', 'est_precio_venta', 'est_agente_pct', 'est_impuesto_pct'];
+    return campos.some(c => Math.abs((Number(p[c]) || 0) - (Number(v[c]) || 0)) > 0.5);
   }
 
   function cfShowTab(name) {
@@ -2483,8 +2503,13 @@
     });
     document.getElementById('cfRepartoTable').innerHTML = repRows;
 
+    const fichaDesactualizada = cfEstimadoDesactualizado(p);
     document.getElementById('cfFichaVinculadaPanel').innerHTML = p.ficha_id
-      ? '<h3>Ficha vinculada</h3><p style="font-size:11.5px; color:#5A6B80; line-height:1.5;">Este proyecto está vinculado a la <b>Ficha ' + escapeHtml(cfFichaLabels[p.ficha_id] || '') + '</b> (los montos "Estimado" de arriba son los que quedaron guardados para este proyecto — se traen de la Ficha una vez, no se sincronizan solos después, para que puedas ajustarlos sin que la Ficha te los pise).</p><button class="btn btn-outline cf-btn-sm" onclick="openFichaDesdeProyecto(\'' + p.ficha_id + '\', \'' + p.id + '\')">📄 Abrir ficha</button> <button class="btn btn-outline cf-btn-sm" onclick="cfTraerValoresDeFicha(\'' + p.id + '\')">📥 Traer valores de la Ficha</button> <button class="btn btn-outline cf-btn-sm" onclick="cfQuitarVinculoFicha(\'' + p.id + '\')">Quitar vínculo</button>'
+      ? '<h3>Ficha vinculada</h3><p style="font-size:11.5px; color:#5A6B80; line-height:1.5;">Este proyecto está vinculado a la <b>Ficha ' + escapeHtml(cfFichaLabels[p.ficha_id] || '') + '</b> (los montos "Estimado" de arriba son una copia editable — puedes ajustarlos aquí sin que la Ficha te los pise; si la Ficha cambia después, te avisamos abajo).</p>' +
+        (fichaDesactualizada
+          ? '<div class="cf-split-warn bad">⚠ La Ficha vinculada tiene valores distintos a los guardados aquí. <button class="btn btn-outline cf-btn-sm" style="margin-left:6px;" onclick="cfTraerValoresDeFicha(\'' + p.id + '\')">Traer los nuevos</button></div>'
+          : '') +
+        '<button class="btn btn-outline cf-btn-sm" onclick="openFichaDesdeProyecto(\'' + p.ficha_id + '\', \'' + p.id + '\')">📄 Abrir ficha</button> <button class="btn btn-outline cf-btn-sm" onclick="cfTraerValoresDeFicha(\'' + p.id + '\')">📥 Traer valores de la Ficha</button> <button class="btn btn-outline cf-btn-sm" onclick="cfQuitarVinculoFicha(\'' + p.id + '\')">Quitar vínculo</button>'
       : '<h3>Sin Ficha vinculada</h3><p style="font-size:11.5px; color:#5A6B80; line-height:1.5;">Puedes vincularlo a una Ficha de Rentabilidad ya guardada.</p>' +
         '<button class="btn btn-gold cf-btn-sm" onclick="cfAbrirBuscarFicha(\'' + p.id + '\')">🔎 Buscar y vincular ficha</button>';
   }
@@ -2570,12 +2595,14 @@
         const esVacio = p && (Number(p.est_compra) || 0) === 0 && (Number(p.est_gastos_compra) || 0) === 0 &&
           (Number(p.est_gastos_post) || 0) === 0 && (Number(p.est_precio_venta) || 0) === 0;
         let trajoValores = false;
-        if (esVacio) {
-          try {
-            const fichaCompleta = await db.getFicha(ficha.id);
-            if (fichaCompleta) { Object.assign(patch, fichaValoresEstimados(fichaCompleta)); trajoValores = true; }
-          } catch (err) { console.error(err); }
-        }
+        try {
+          const fichaCompleta = await db.getFicha(ficha.id);
+          if (fichaCompleta) {
+            const valores = fichaValoresEstimados(fichaCompleta);
+            cfFichaEstimadosCache[ficha.id] = valores; // para que el aviso de "Ficha desactualizada" funcione ya mismo
+            if (esVacio) { Object.assign(patch, valores); trajoValores = true; }
+          }
+        } catch (err) { console.error(err); }
         await cfPersistProyecto(pid, patch);
         cfFichaLabels[ficha.id] = ficha.triang_id || '';
         cfRenderDetalle(); cfRenderProyectos();
@@ -5211,4 +5238,3 @@
 
 </body>
 </html>
- 
