@@ -944,6 +944,7 @@
             <div id="cfSplitWarn"></div>
             <table class="cf-fin-table" id="cfRepartoTable"></table>
             <button class="btn btn-outline cf-btn-sm" style="margin-top:10px;" onclick="cfAddRepartoRow()">+ Agregar socio al reparto</button>
+            <button class="btn btn-outline cf-btn-sm" style="margin-top:10px;" onclick="cfRepartirIgual(cfCurrentProyectoId)">⚖ Repartir en partes iguales</button>
           </div>
           <div class="cf-panel" id="cfFichaVinculadaPanel"></div>
         </div>
@@ -2140,12 +2141,15 @@
   function cfGastosRealPorProyecto(p, cats) {
     return (p.gastos || []).filter(g => cats.includes(g.categoria)).reduce((s, g) => s + (Number(g.monto) || 0), 0);
   }
-  function cfMesesEntre(fechaInicioStr, fechaFinStr) {
+  // Días calendario exactos entre dos fechas (no meses redondeados) — así el
+  // interés simple no le "regala" ni le "roba" los días sueltos que sobran
+  // de un mes a otro.
+  function cfDiasEntre(fechaInicioStr, fechaFinStr) {
     const inicio = new Date(fechaInicioStr);
-    if (isNaN(inicio.getTime())) return 1;
+    if (isNaN(inicio.getTime())) return 0;
     const finParsed = new Date(fechaFinStr);
     const fin = isNaN(finParsed.getTime()) ? new Date() : finParsed;
-    return Math.max(1, (fin.getFullYear() - inicio.getFullYear()) * 12 + (fin.getMonth() - inicio.getMonth()));
+    return Math.max(0, Math.round((fin.getTime() - inicio.getTime()) / 86400000));
   }
   function cfSaldoPrestamo(pr) {
     const pagado = (pr.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0), 0);
@@ -2178,8 +2182,8 @@
       return Number(pr.interes_manual) || 0;
     }
     const fin = cfFechaFinInteres(p, pr);
-    const meses = cfMesesEntre(pr.fecha, fin);
-    return (Number(pr.monto) || 0) * ((Number(pr.tasa) || 0) / 100) * (meses / 12);
+    const dias = cfDiasEntre(pr.fecha, fin);
+    return (Number(pr.monto) || 0) * ((Number(pr.tasa) || 0) / 100) * (dias / 365);
   }
   function cfInteresEsManual(pr) {
     return pr.interes_manual !== undefined && pr.interes_manual !== null && pr.interes_manual !== '';
@@ -2596,15 +2600,47 @@
     cfRenderDetalle();
     showToast('Socio quitado del reparto');
   }
+  // Reparte 100% en partes iguales entre n socios, con 2 decimales exactos
+  // (ej. 3 socios → 33.33 / 33.33 / 33.34 en vez de tener que ajustar a mano
+  // un número para que la suma dé justo 100). El centavo sobrante por
+  // redondeo se lo lleva el último socio de la lista.
+  function cfPctsIguales(n) {
+    if (n <= 0) return [];
+    const base = Math.floor((100 / n) * 100) / 100;
+    const pcts = new Array(n).fill(base);
+    const residuo = Math.round((100 - base * n) * 100) / 100;
+    pcts[n - 1] = Math.round((pcts[n - 1] + residuo) * 100) / 100;
+    return pcts;
+  }
   async function cfAddRepartoRow() {
     const p = cfProyectos.find(x => x.id === cfCurrentProyectoId);
     if (!p) return;
     const disponible = cfSocios.find(s => !(p.reparto || []).some(r => r.socio_id === s.id));
     if (!disponible) { showToast('Ya están todos los socios en el reparto'); return; }
-    const reparto = [...(p.reparto || []), { socio_id: disponible.id, pct: 0 }];
+    // Al agregar un socio, se reparte 100% en partes iguales entre todos los
+    // que quedan en la lista (con decimales) — tú puedes seguir editando
+    // cualquier % a mano después si el reparto real no es parejo.
+    const nuevaLista = [...(p.reparto || []), { socio_id: disponible.id, pct: 0 }];
+    const pcts = cfPctsIguales(nuevaLista.length);
+    const reparto = nuevaLista.map((r, i) => ({ ...r, pct: pcts[i] }));
     p.reparto = reparto;
     try { await cfPersistProyecto(p.id, { reparto }); } catch (err) { console.error(err); showToast('No se pudo guardar.'); }
     cfRenderDetalle();
+  }
+  async function cfRepartirIgual(pid) {
+    const p = cfProyectos.find(x => x.id === pid);
+    if (!p || !(p.reparto || []).length) return;
+    const pcts = cfPctsIguales(p.reparto.length);
+    const reparto = p.reparto.map((r, i) => ({ ...r, pct: pcts[i] }));
+    p.reparto = reparto;
+    try {
+      await cfPersistProyecto(pid, { reparto });
+      cfRenderDetalle();
+      showToast('Reparto igualado ✓ — puedes seguir ajustando cada % a mano');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo guardar.');
+    }
   }
   async function cfBorrarGasto(gid) {
     const p = cfProyectos.find(x => x.id === cfCurrentProyectoId);
@@ -2854,7 +2890,8 @@
         const interes = cfInteresPrestamo(p, pr);
         const finInteres = cfFechaFinInteres(p, pr);
         const esManual = cfInteresEsManual(pr);
-        const interesTitle = esManual ? 'Ajustado a mano — borra el valor para volver al cálculo automático' : ('Calculado solo: desde ' + (pr.fecha || '') + ' hasta ' + finInteres);
+        const diasInteres = cfDiasEntre(pr.fecha, finInteres);
+        const interesTitle = esManual ? 'Ajustado a mano — borra el valor para volver al cálculo automático' : (diasInteres + ' días (÷365) — desde ' + (pr.fecha || '') + ' hasta ' + finInteres);
         rows += '<tr><td>' + escapeHtml(pr.prestamistas) + '</td><td>' + escapeHtml(p.nombre) + '</td>' +
           '<td class="num">' + cfFmt(pr.monto) + '</td><td class="num">' + pr.tasa + '%</td><td class="num">' + cfFmt(saldo) + '</td>' +
           '<td class="num" title="' + escapeHtml(interesTitle) + '">' +
