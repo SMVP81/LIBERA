@@ -2035,7 +2035,13 @@
   // y su "Real" era una copia fija del Estimado; ahora sí se suma en vivo
   // de la Bitácora, igual que las otras dos filas.
   const CF_CATS_MONTO_COMPRA = ['Pago a acreedor 1', 'Pago a acreedor 2', 'Pago a acreedor 3', 'Pago a propietario', 'Incentivo para el propietario', 'Efectivo 1', 'Efectivo 2', 'Efectivo 3'];
-  const CF_CATS_COMPRA = ['Abogado + Gastos Notariales', 'Gastos Registrales (compra vta + lev. hip.)', 'Gastos Notariales (legalización de firmas, envío, etc)', 'Partida Registral para la compra', 'Alcabala 3% (sobre el excedente 10 UIT)', 'Deudas Municipales (Arb y Predios)', 'Deuda Mantenimiento de edificio', 'Deudas de Servicios de luz', 'Air BNB', 'Intereses', 'Gastos Bancarios (Intereses y otros)'];
+  // 'Intereses' NO está en esta lista a propósito: el interés de un préstamo
+  // ya se calcula solo (ver cfInteresesCalculados) y aparece en su propia
+  // fila "Intereses" de la tabla Estimado vs Real. Si estuviera también aquí
+  // como categoría de gasto, un interés real cargado a mano se restaría DOS
+  // veces de la Utilidad Neta. Un pago de interés real de un préstamo se
+  // registra con el botón "+ Pago" en la pestaña Préstamos, no como gasto.
+  const CF_CATS_COMPRA = ['Abogado + Gastos Notariales', 'Gastos Registrales (compra vta + lev. hip.)', 'Gastos Notariales (legalización de firmas, envío, etc)', 'Partida Registral para la compra', 'Alcabala 3% (sobre el excedente 10 UIT)', 'Deudas Municipales (Arb y Predios)', 'Deuda Mantenimiento de edificio', 'Deudas de Servicios de luz', 'Air BNB', 'Gastos Bancarios (Intereses y otros)'];
   const CF_CATS_POST = ['Servicio de mantenimiento de edificio', 'Servicio de luz', 'Municipalidad (Arb y Predios)', 'Partida registral para la venta'];
   // "Otros gastos" es su propio grupo en el desplegable (para que sea más
   // fácil de encontrar), pero para el cálculo de Utilidad Neta se suma
@@ -2134,21 +2140,41 @@
   function cfGastosRealPorProyecto(p, cats) {
     return (p.gastos || []).filter(g => cats.includes(g.categoria)).reduce((s, g) => s + (Number(g.monto) || 0), 0);
   }
-  function cfMesesDesde(fechaStr) {
-    const inicio = new Date(fechaStr);
+  function cfMesesEntre(fechaInicioStr, fechaFinStr) {
+    const inicio = new Date(fechaInicioStr);
     if (isNaN(inicio.getTime())) return 1;
-    const hoy = new Date();
-    return Math.max(1, (hoy.getFullYear() - inicio.getFullYear()) * 12 + (hoy.getMonth() - inicio.getMonth()));
-  }
-  function cfInteresesCalculados(p) {
-    return (p.prestamos || []).reduce((sum, pr) => {
-      const meses = cfMesesDesde(pr.fecha);
-      return sum + (Number(pr.monto) || 0) * ((Number(pr.tasa) || 0) / 100) * (meses / 12);
-    }, 0);
+    const finParsed = new Date(fechaFinStr);
+    const fin = isNaN(finParsed.getTime()) ? new Date() : finParsed;
+    return Math.max(1, (fin.getFullYear() - inicio.getFullYear()) * 12 + (fin.getMonth() - inicio.getMonth()));
   }
   function cfSaldoPrestamo(pr) {
     const pagado = (pr.pagos || []).reduce((s, x) => s + (Number(x.monto) || 0), 0);
     return (Number(pr.monto) || 0) - pagado;
+  }
+  // ¿Hasta qué fecha se debe acumular el interés de ESTE préstamo?
+  // - Si ya está pagado (saldo <= 0): se congela en la fecha de su último pago
+  //   (el interés no debe seguir creciendo después de liquidado).
+  // - Si sigue vigente pero el proyecto ya se vendió: hasta la fecha de venta
+  //   (después de vendido ya no tiene sentido seguir acumulando interés real).
+  // - Si sigue vigente y el proyecto sigue activo: hasta hoy.
+  function cfFechaFinInteres(p, pr) {
+    const saldo = cfSaldoPrestamo(pr);
+    if (saldo <= 0) {
+      const pagos = pr.pagos || [];
+      if (pagos.length) {
+        return pagos.reduce((max, x) => (x.fecha && x.fecha > max ? x.fecha : max), pagos[0].fecha || '');
+      }
+    }
+    if (p.estado === 'Vendido' && p.fecha_venta) return p.fecha_venta;
+    return new Date().toISOString().slice(0, 10);
+  }
+  function cfInteresPrestamo(p, pr) {
+    const fin = cfFechaFinInteres(p, pr);
+    const meses = cfMesesEntre(pr.fecha, fin);
+    return (Number(pr.monto) || 0) * ((Number(pr.tasa) || 0) / 100) * (meses / 12);
+  }
+  function cfInteresesCalculados(p) {
+    return (p.prestamos || []).reduce((sum, pr) => sum + cfInteresPrestamo(p, pr), 0);
   }
   function cfUtilidadProyecto(p) {
     const compraReal = cfGastosRealPorProyecto(p, CF_CATS_MONTO_COMPRA);
@@ -2808,19 +2834,22 @@
 
   /* ---- PRÉSTAMOS (agregados de todos los proyectos) ---- */
   function cfRenderPrestamos() {
-    let rows = '<tr><th>Prestamistas</th><th>Proyecto</th><th class="num">Monto</th><th class="num">Tasa anual</th><th class="num">Saldo</th><th>Estado</th><th></th></tr>';
+    let rows = '<tr><th>Prestamistas</th><th>Proyecto</th><th class="num">Monto</th><th class="num">Tasa anual</th><th class="num">Saldo</th><th class="num">Interés acumulado</th><th>Estado</th><th></th></tr>';
     let any = false;
     cfProyectos.forEach(p => {
       (p.prestamos || []).forEach(pr => {
         any = true;
         const saldo = cfSaldoPrestamo(pr);
+        const interes = cfInteresPrestamo(p, pr);
+        const finInteres = cfFechaFinInteres(p, pr);
         rows += '<tr><td>' + escapeHtml(pr.prestamistas) + '</td><td>' + escapeHtml(p.nombre) + '</td>' +
           '<td class="num">' + cfFmt(pr.monto) + '</td><td class="num">' + pr.tasa + '%</td><td class="num">' + cfFmt(saldo) + '</td>' +
+          '<td class="num" title="Calculado desde ' + escapeHtml(pr.fecha || '') + ' hasta ' + escapeHtml(finInteres) + '">' + cfFmt(interes) + '</td>' +
           '<td>' + (saldo <= 0 ? '<span class="cf-pill ok">Pagado</span>' : '<span class="cf-pill warn">Vigente</span>') + '</td>' +
           '<td><button class="btn btn-outline cf-btn-sm" onclick="cfAbrirPago(\'' + p.id + '\',\'' + pr.id + '\')" ' + (saldo <= 0 ? 'disabled' : '') + '>+ Pago</button></td></tr>';
       });
     });
-    if (!any) rows += '<tr><td colspan="7" style="color:#97A2B0; font-style:italic;">Sin préstamos registrados todavía.</td></tr>';
+    if (!any) rows += '<tr><td colspan="8" style="color:#97A2B0; font-style:italic;">Sin préstamos registrados todavía.</td></tr>';
     document.getElementById('cfPrestamosTable').innerHTML = rows;
   }
   function cfAbrirNuevoPrestamo() {
