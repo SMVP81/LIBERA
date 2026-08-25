@@ -962,7 +962,7 @@
       <div class="cf-toolbar" style="justify-content:flex-end;">
         <button class="btn btn-gold" onclick="cfAbrirNuevoPrestamo()">+ Nuevo préstamo</button>
       </div>
-      <div class="cf-note">Cada préstamo es su propio registro — monto, tasa y proyecto — con sus pagos abonados por separado. El interés del proyecto (en Detalle) sale calculado de aquí, no se vuelve a escribir a mano.</div>
+      <div class="cf-note">Cada préstamo es su propio registro — monto, tasa y proyecto — con sus pagos abonados por separado. El interés se calcula solo (hasta que se paga o se vende el proyecto), pero puedes ajustarlo a mano en la tabla si el monto real fue distinto. Usa ✎ para corregir un préstamo ya creado.</div>
       <div class="cf-panel" style="padding:0;"><table class="cf-table" id="cfPrestamosTable"></table></div>
     </div>
 
@@ -2865,7 +2865,11 @@
             '</span>' +
           '</td>' +
           '<td>' + (saldo <= 0 ? '<span class="cf-pill ok">Pagado</span>' : '<span class="cf-pill warn">Vigente</span>') + '</td>' +
-          '<td><button class="btn btn-outline cf-btn-sm" onclick="cfAbrirPago(\'' + p.id + '\',\'' + pr.id + '\')" ' + (saldo <= 0 ? 'disabled' : '') + '>+ Pago</button></td></tr>';
+          '<td style="white-space:nowrap;">' +
+            '<button class="btn btn-outline cf-btn-sm" onclick="cfAbrirPago(\'' + p.id + '\',\'' + pr.id + '\')" ' + (saldo <= 0 ? 'disabled' : '') + '>+ Pago</button> ' +
+            '<button class="cf-edit-btn" title="Editar préstamo" onclick="cfAbrirEditarPrestamo(\'' + p.id + '\',\'' + pr.id + '\')">✎</button> ' +
+            '<button class="cf-rm-btn" title="Eliminar préstamo" onclick="cfBorrarPrestamo(\'' + p.id + '\',\'' + pr.id + '\')">×</button>' +
+          '</td></tr>';
       });
     });
     if (!any) rows += '<tr><td colspan="8" style="color:#97A2B0; font-style:italic;">Sin préstamos registrados todavía.</td></tr>';
@@ -2919,6 +2923,88 @@
   function cfClosePrestamoModal() {
     const overlay = document.getElementById('cfPrestamoModalOverlay');
     if (overlay) document.body.removeChild(overlay);
+  }
+  // Corrige un préstamo ya creado — antes no había forma de arreglar un
+  // monto, tasa o fecha mal cargados salvo borrar todo y volver a crearlo.
+  // Reusa el mismo modal de "Nuevo préstamo" pero precargado, y si cambias
+  // el Proyecto, mueve el préstamo (con sus pagos) de un proyecto al otro.
+  function cfAbrirEditarPrestamo(proyectoId, prestamoId) {
+    const p = cfProyectos.find(x => x.id === proyectoId);
+    const pr = p && (p.prestamos || []).find(x => x.id === prestamoId);
+    if (!p || !pr) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'pipeline-modal-overlay';
+    overlay.id = 'cfPrestamoModalOverlay';
+    overlay.onclick = (e) => { if (e.target === overlay) cfClosePrestamoModal(); };
+    const modal = document.createElement('div');
+    modal.className = 'pipeline-modal';
+    const proyOpts = cfProyectos.map(x => '<option value="' + x.id + '"' + (x.id === proyectoId ? ' selected' : '') + '>' + escapeHtml(x.nombre) + '</option>').join('');
+    modal.innerHTML =
+      '<h3>Editar préstamo</h3>' +
+      '<div class="field"><label>Proyecto</label><select id="cfPrestamoProyecto">' + proyOpts + '</select></div>' +
+      '<div class="field"><label>Prestamista(s)</label><input type="text" id="cfPrestamoPrestamistas" value="' + escapeHtml(pr.prestamistas || '') + '" /></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>Monto</label><input type="text" id="cfPrestamoMonto" value="' + formatAmt(pr.monto) + '" /></div>' +
+        '<div class="field"><label>Tasa anual (%)</label><input type="text" id="cfPrestamoTasa" value="' + (pr.tasa != null ? pr.tasa : '') + '" /></div>' +
+      '</div>' +
+      '<div class="field"><label>Fecha de inicio</label><input type="date" id="cfPrestamoFecha" value="' + (pr.fecha || '') + '" /></div>' +
+      '<div class="modal-actions"><button class="btn btn-outline" onclick="cfClosePrestamoModal()">Cancelar</button><button class="btn btn-gold" onclick="cfGuardarEdicionPrestamo(\'' + proyectoId + '\', \'' + prestamoId + '\')">Guardar cambios</button></div>';
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+  async function cfGuardarEdicionPrestamo(proyectoIdOriginal, prestamoId) {
+    const nuevoProyectoId = document.getElementById('cfPrestamoProyecto').value;
+    const prestamistas = document.getElementById('cfPrestamoPrestamistas').value.trim();
+    const monto = parseNum(document.getElementById('cfPrestamoMonto').value);
+    if (!monto || !prestamistas) { showToast('Falta el monto o los prestamistas'); return; }
+    const tasa = parseNum(document.getElementById('cfPrestamoTasa').value) || 0;
+    const fecha = document.getElementById('cfPrestamoFecha').value;
+    if (!fecha) { showToast('Falta la fecha de inicio'); return; }
+    const pOrig = cfProyectos.find(x => x.id === proyectoIdOriginal);
+    const prOrig = pOrig && (pOrig.prestamos || []).find(x => x.id === prestamoId);
+    if (!pOrig || !prOrig) return;
+    const prActualizado = { ...prOrig, prestamistas, monto, tasa, fecha };
+    try {
+      if (nuevoProyectoId === proyectoIdOriginal) {
+        const prestamos = pOrig.prestamos.map(x => x.id === prestamoId ? prActualizado : x);
+        pOrig.prestamos = prestamos;
+        await cfPersistProyecto(proyectoIdOriginal, { prestamos });
+      } else {
+        const pDestino = cfProyectos.find(x => x.id === nuevoProyectoId);
+        if (!pDestino) return;
+        const prestamosOrig = pOrig.prestamos.filter(x => x.id !== prestamoId);
+        const prestamosDestino = [...(pDestino.prestamos || []), prActualizado];
+        pOrig.prestamos = prestamosOrig;
+        pDestino.prestamos = prestamosDestino;
+        await cfPersistProyecto(proyectoIdOriginal, { prestamos: prestamosOrig });
+        await cfPersistProyecto(nuevoProyectoId, { prestamos: prestamosDestino });
+      }
+      cfClosePrestamoModal();
+      cfRenderPrestamos();
+      if (cfCurrentProyectoId === proyectoIdOriginal || cfCurrentProyectoId === nuevoProyectoId) cfRenderDetalle();
+      cfRenderResumen();
+      showToast('Préstamo actualizado ✓');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo actualizar el préstamo.');
+    }
+  }
+  async function cfBorrarPrestamo(proyectoId, prestamoId) {
+    const p = cfProyectos.find(x => x.id === proyectoId);
+    if (!p) return;
+    if (!confirm('¿Eliminar este préstamo y todos sus pagos registrados? Esta acción no se puede deshacer.')) return;
+    const prestamos = (p.prestamos || []).filter(pr => pr.id !== prestamoId);
+    p.prestamos = prestamos;
+    try {
+      await cfPersistProyecto(proyectoId, { prestamos });
+      cfRenderPrestamos();
+      if (cfCurrentProyectoId === proyectoId) cfRenderDetalle();
+      cfRenderResumen();
+      showToast('Préstamo eliminado');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo eliminar el préstamo.');
+    }
   }
   async function cfCrearPrestamo() {
     const proyectoId = document.getElementById('cfPrestamoProyecto').value;
