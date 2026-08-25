@@ -1250,6 +1250,10 @@
       async reorderProyectosFinancieros(orderedIds) {
         await Promise.all(orderedIds.map((id, i) => sb.from('proyectos_financieros').update({ sort_order: i }).eq('id', id)));
       },
+      async deleteProyectoFinanciero(id) {
+        const { error } = await sb.from('proyectos_financieros').delete().eq('id', id);
+        if (error) throw error;
+      },
       async findFichaByTriangId(triangId) {
         const { data, error } = await sb.from('fichas').select('id, triang_id').eq('triang_id', triangId).limit(1).maybeSingle();
         if (error) throw error;
@@ -1508,6 +1512,9 @@
           const p = memProyectosFinancieros.find(x => x.id === id);
           if (p) p.sort_order = i;
         });
+      },
+      async deleteProyectoFinanciero(id) {
+        memProyectosFinancieros = memProyectosFinancieros.filter(p => p.id !== id);
       },
       async findFichaByTriangId(triangId) {
         return memStore.find(f => f.triang_id === triangId) || null;
@@ -2311,7 +2318,7 @@
   function cfRenderProyectos() {
     const q = (document.getElementById('cfBuscarProyecto').value || '').toLowerCase();
     const filtrando = q.length > 0;
-    let rows = '<tr><th></th><th>Proyecto</th><th>Vínculo</th><th>Estado</th><th class="num">Inversión estimada</th><th class="num">Inversión real</th><th>Reparto</th></tr>';
+    let rows = '<tr><th></th><th>Proyecto</th><th>Vínculo</th><th>Estado</th><th class="num">Inversión estimada</th><th class="num">Inversión real</th><th>Reparto</th><th></th></tr>';
     cfProyectos.filter(p => p.nombre.toLowerCase().includes(q)).forEach(p => {
       const u = cfUtilidadProyecto(p);
       const estimadaVTA = (Number(p.est_compra) || 0) + (Number(p.est_gastos_compra) || 0) + (Number(p.est_gastos_post) || 0);
@@ -2326,9 +2333,10 @@
         '<td class="num">' + cfFmt(estimadaVTA) + '</td>' +
         '<td class="num">' + cfFmt(u.vtaReal) + '</td>' +
         '<td>' + cfRepartoPillHtml(p) + '</td>' +
+        '<td class="actions" onclick="event.stopPropagation()"><button class="cf-rm-btn" onclick="cfEliminarProyecto(\'' + p.id + '\')" title="Eliminar proyecto">×</button></td>' +
         '</tr>';
     });
-    if (!cfProyectos.length) rows += '<tr><td colspan="7" style="color:#97A2B0; font-style:italic; padding:14px;">Sin proyectos todavía — crea el primero con "+ Nuevo proyecto".</td></tr>';
+    if (!cfProyectos.length) rows += '<tr><td colspan="8" style="color:#97A2B0; font-style:italic; padding:14px;">Sin proyectos todavía — crea el primero con "+ Nuevo proyecto".</td></tr>';
     document.getElementById('cfProyectosTable').innerHTML = rows;
   }
 
@@ -2468,6 +2476,30 @@
     }
   }
 
+  async function cfEliminarProyecto(pid) {
+    const p = cfProyectos.find(x => x.id === pid);
+    if (!p) return;
+    const nGastos = (p.gastos || []).length;
+    const nPrestamos = (p.prestamos || []).length;
+    const detalle = (nGastos || nPrestamos)
+      ? ' Se borran también su bitácora (' + nGastos + ' gasto' + (nGastos === 1 ? '' : 's') + ') y sus préstamos (' + nPrestamos + ').'
+      : '';
+    if (!confirm('¿Eliminar el proyecto "' + p.nombre + '"?' + detalle + ' Esta acción no se puede deshacer.')) return;
+    try {
+      await db.deleteProyectoFinanciero(pid);
+      cfProyectos = cfProyectos.filter(x => x.id !== pid);
+      if (cfCurrentProyectoId === pid) {
+        cfCurrentProyectoId = null;
+        cfShowTab('proyectos');
+      }
+      cfRenderProyectos(); cfRenderResumen();
+      showToast('Proyecto eliminado');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo eliminar el proyecto.');
+    }
+  }
+
   /* ---- DETALLE DE PROYECTO ---- */
   function cfAbrirDetalle(pid) { cfCurrentProyectoId = pid; cfShowTab('detalle'); }
 
@@ -2492,7 +2524,8 @@
     const estUtilidad = precioVenta - estAgente - estImpuesto - estimadaVTA;
 
     titEl.innerHTML = '<span>' + escapeHtml(p.nombre) + '</span>' +
-      (p.ficha_id ? '<span class="cf-badge-linked" style="cursor:pointer;" onclick="openFichaDesdeProyecto(\'' + p.ficha_id + '\', \'' + p.id + '\')" title="Abrir ficha vinculada">🔗 Vinculado a Ficha de Rentabilidad ' + escapeHtml(cfFichaLabels[p.ficha_id] || '') + '</span>' : '<span class="cf-pill muted">Sin vincular a Ficha</span>');
+      (p.ficha_id ? '<span class="cf-badge-linked" style="cursor:pointer;" onclick="openFichaDesdeProyecto(\'' + p.ficha_id + '\', \'' + p.id + '\')" title="Abrir ficha vinculada">🔗 Vinculado a Ficha de Rentabilidad ' + escapeHtml(cfFichaLabels[p.ficha_id] || '') + '</span>' : '<span class="cf-pill muted">Sin vincular a Ficha</span>') +
+      '<button class="cf-rm-btn" style="margin-left:8px; font-size:11px; font-weight:normal;" onclick="cfEliminarProyecto(\'' + p.id + '\')" title="Eliminar proyecto">🗑 Eliminar proyecto</button>';
 
     document.getElementById('cfDetalleEstadoToolbar').innerHTML =
       '<label style="font-size:11px; color:#5A6B80;">Estado</label>' + cfEstadoSelectHtml(p) +
@@ -2538,7 +2571,7 @@
     const total = cfSumReparto(p);
     let bar = '';
     const colors = ['#0A2545', '#1C3F66', '#C9A227', '#7A5A12', '#3E6B8A'];
-    (p.reparto || []).forEach((r, i) => { bar += '<div class="cf-split-seg" style="width:' + Math.max(r.pct, 4) + '%; background:' + colors[i % colors.length] + ';">' + escapeHtml(cfSocioNombre(r.socio_id)) + ' ' + r.pct + '%</div>'; });
+    (p.reparto || []).forEach((r, i) => { bar += '<div class="cf-split-seg" style="width:' + Math.max(r.pct, 4) + '%; background:' + colors[i % colors.length] + ';">' + escapeHtml(cfSocioNombre(r.socio_id)) + ' ' + cfPctDisplayVal(r.pct) + '%</div>'; });
     document.getElementById('cfSplitBar').innerHTML = bar || '<div style="color:#97A2B0; font-size:11px; padding:6px;">Sin reparto asignado</div>';
     document.getElementById('cfSplitWarn').innerHTML = total === 100
       ? '<div class="cf-split-warn ok">✓ Suma 100%' + (p.estado === 'Vendido' ? ' — reparto completo' : ' — listo para cuando se venda') + '</div>'
@@ -2550,7 +2583,7 @@
     (p.reparto || []).forEach((r, i) => {
       repRows += '<tr>' +
         '<td style="text-align:left;">' + escapeHtml(cfSocioNombre(r.socio_id)) + '</td>' +
-        '<td><input class="cf-pct-input" type="number" value="' + r.pct + '" onchange="cfCambiarPct(\'' + p.id + '\', ' + i + ', this.value)" /></td>' +
+        '<td><input class="cf-pct-input" type="number" step="any" value="' + cfPctDisplayVal(r.pct) + '" onchange="cfCambiarPct(\'' + p.id + '\', ' + i + ', this.value)" /></td>' +
         '<td>' + cfFmtN(u.utilidadNeta * r.pct / 100) + '</td>' +
         '<td class="rm"><button class="cf-rm-btn" onclick="cfQuitarReparto(\'' + p.id + '\', ' + i + ')">×</button></td>' +
         '</tr>';
@@ -2600,17 +2633,22 @@
     cfRenderDetalle();
     showToast('Socio quitado del reparto');
   }
-  // Reparte 100% en partes iguales entre n socios, con 2 decimales exactos
-  // (ej. 3 socios → 33.33 / 33.33 / 33.34 en vez de tener que ajustar a mano
-  // un número para que la suma dé justo 100). El centavo sobrante por
-  // redondeo se lo lleva el último socio de la lista.
+  // Reparte 100% en partes EXACTAMENTE iguales entre n socios — sin
+  // redondear a 2 decimales, porque redondear (33.33/33.33/33.34) le da a
+  // uno un 0.01% de más que, aplicado a una utilidad real, se traduce en
+  // soles de más para esa persona (justo lo que reportó Samuel: "lo que
+  // corresponde a cada uno no es igual"). Guardando 100/n sin redondear, el
+  // monto en soles de cada socio sale idéntico (la pantalla sí redondea el
+  // % que se ve, pero el valor guardado y usado para calcular queda exacto).
   function cfPctsIguales(n) {
     if (n <= 0) return [];
-    const base = Math.floor((100 / n) * 100) / 100;
-    const pcts = new Array(n).fill(base);
-    const residuo = Math.round((100 - base * n) * 100) / 100;
-    pcts[n - 1] = Math.round((pcts[n - 1] + residuo) * 100) / 100;
-    return pcts;
+    return new Array(n).fill(100 / n);
+  }
+  // Redondeo SOLO para mostrar el % en el campo editable — el valor guardado
+  // en r.pct (el que se usa para calcular "le corresponde") no se toca a
+  // menos que el socio lo edite a mano.
+  function cfPctDisplayVal(pct) {
+    return Math.round((Number(pct) || 0) * 10000) / 10000;
   }
   async function cfAddRepartoRow() {
     const p = cfProyectos.find(x => x.id === cfCurrentProyectoId);
