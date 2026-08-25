@@ -2029,8 +2029,20 @@
    * arreglo completo del proyecto, modificarlo en memoria, y grabar de
    * nuevo esa sola columna.
    * ==================================================================== */
-  const CF_CATS_COMPRA = ['Pago a propietario', 'Gastos Bancarios (Intereses y otros)', 'Alcabala 3% (sobre el excedente 10 UIT)', 'Abogado + Gastos Notariales', 'Gastos Registrales (compra vta + lev. hip.)', 'Gastos Notariales (legalización de firmas, envío, etc)', 'Partida Registral para la compra', 'Deudas Municipales (Arb y Predios)', 'Deuda Mantenimiento de edificio', 'Deudas de Servicios de luz', 'Arancel'];
-  const CF_CATS_POST = ['Servicio de mantenimiento de edificio', 'Servicio de luz', 'Municipalidad (Arb y Predios)', 'Partida registral para la venta', 'Otros gastos', 'Gastos de condominio', 'Gastos de remodelación'];
+  // Categorías del "Monto de compra total" — los desembolsos que SON la
+  // compra en sí (a acreedores, al propietario, incentivos, efectivo), no
+  // gastos de la transacción. Antes esta fila no tenía categorías propias
+  // y su "Real" era una copia fija del Estimado; ahora sí se suma en vivo
+  // de la Bitácora, igual que las otras dos filas.
+  const CF_CATS_MONTO_COMPRA = ['Pago a acreedor 1', 'Pago a acreedor 2', 'Pago a acreedor 3', 'Pago a propietario', 'Incentivo para el propietario', 'Efectivo 1', 'Efectivo 2', 'Efectivo 3'];
+  const CF_CATS_COMPRA = ['Abogado + Gastos Notariales', 'Gastos Registrales (compra vta + lev. hip.)', 'Gastos Notariales (legalización de firmas, envío, etc)', 'Partida Registral para la compra', 'Alcabala 3% (sobre el excedente 10 UIT)', 'Deudas Municipales (Arb y Predios)', 'Deuda Mantenimiento de edificio', 'Deudas de Servicios de luz', 'Air BNB', 'Intereses', 'Gastos Bancarios (Intereses y otros)'];
+  const CF_CATS_POST = ['Servicio de mantenimiento de edificio', 'Servicio de luz', 'Municipalidad (Arb y Predios)', 'Partida registral para la venta'];
+  // "Otros gastos" es su propio grupo en el desplegable (para que sea más
+  // fácil de encontrar), pero para el cálculo de Utilidad Neta se suma
+  // junto con "Gastos posteriores a la compra-venta" — no tiene su propia
+  // fila de Estimado. Se mantiene la categoría genérica "Otros gastos" al
+  // final para no dejar huérfanos los gastos ya cargados con esa etiqueta.
+  const CF_CATS_OTROS = ['Gastos de condominio', 'Gastos de remodelación', 'Oblaje y saldo', 'Arancel', 'Otros gastos'];
   const CF_ESTADOS = ['En análisis', 'Remodelación', 'En venta', 'Vendido'];
 
   let cfSocios = [];
@@ -2139,16 +2151,17 @@
     return (Number(pr.monto) || 0) - pagado;
   }
   function cfUtilidadProyecto(p) {
+    const compraReal = cfGastosRealPorProyecto(p, CF_CATS_MONTO_COMPRA);
     const gCompraReal = cfGastosRealPorProyecto(p, CF_CATS_COMPRA);
-    const gPostReal = cfGastosRealPorProyecto(p, CF_CATS_POST);
-    const vtaReal = (Number(p.est_compra) || 0) + gCompraReal + gPostReal;
+    const gPostReal = cfGastosRealPorProyecto(p, [...CF_CATS_POST, ...CF_CATS_OTROS]);
+    const vtaReal = compraReal + gCompraReal + gPostReal;
     const precioVenta = Number(p.est_precio_venta) || 0;
     const agenteReal = precioVenta * ((Number(p.est_agente_pct) || 0) / 100);
     const impuestoReal = (precioVenta - vtaReal) * ((Number(p.est_impuesto_pct) || 0) / 100);
     const interesesReal = cfInteresesCalculados(p);
     const utilidadNeta = precioVenta - agenteReal - impuestoReal - interesesReal - vtaReal;
     const rentNeta = precioVenta ? utilidadNeta / precioVenta : 0;
-    return { gCompraReal, gPostReal, vtaReal, agenteReal, impuestoReal, interesesReal, utilidadNeta, rentNeta };
+    return { compraReal, gCompraReal, gPostReal, vtaReal, agenteReal, impuestoReal, interesesReal, utilidadNeta, rentNeta };
   }
   function cfSumReparto(p) { return (p.reparto || []).reduce((s, r) => s + (Number(r.pct) || 0), 0); }
 
@@ -2461,7 +2474,7 @@
         '<td>' + cfFmtN(real) + '</td><td class="' + varClass + '">' + (varv === 0 ? '0' : (varv > 0 ? '+' : '−') + Math.abs(Math.round(varv)).toLocaleString('es-PE')) + '</td></tr>';
     }
     let fin = '<tr><th>Concepto</th><th>Estimado</th><th>Real</th><th>Variación</th></tr>';
-    fin += estRow('Monto de compra total', 'est_compra', p.est_compra, p.est_compra, 0);
+    fin += estRow('Monto de compra total', 'est_compra', p.est_compra, u.compraReal, u.compraReal - (Number(p.est_compra) || 0), 'suma en vivo de la bitácora');
     fin += estRow('Gastos para la compra-venta', 'est_gastos_compra', p.est_gastos_compra, u.gCompraReal, u.gCompraReal - (Number(p.est_gastos_compra) || 0), 'suma en vivo de la bitácora');
     fin += estRow('Gastos posteriores a la compra-venta', 'est_gastos_post', p.est_gastos_post, u.gPostReal, u.gPostReal - (Number(p.est_gastos_post) || 0), 'suma en vivo de la bitácora');
     fin += '<tr class="total"><td>Total inversión para la venta (VTA)</td><td>' + cfFmtN(estimadaVTA) + '</td><td>' + cfFmtN(u.vtaReal) + '</td><td>' + cfFmtN(u.vtaReal - estimadaVTA) + '</td></tr>';
@@ -2691,7 +2704,7 @@
       '<div class="field"><label>Fecha</label><input type="date" id="cfGastoFecha" value="' + (g ? g.fecha || '' : '') + '" /></div>' +
       '<div class="field-row">' +
         '<div class="field"><label>Socio que pagó</label><select id="cfGastoSocio">' + socioOpts + '</select></div>' +
-        '<div class="field"><label>Categoría</label><select id="cfGastoCategoria">' + catOptGroup('Gastos para la Compra Venta', CF_CATS_COMPRA) + catOptGroup('Gastos Posterior de la Compra Venta', CF_CATS_POST) + '</select></div>' +
+        '<div class="field"><label>Categoría</label><select id="cfGastoCategoria">' + catOptGroup('Monto de compra total', CF_CATS_MONTO_COMPRA) + catOptGroup('Gastos para la Compra Venta', CF_CATS_COMPRA) + catOptGroup('Gastos Posterior de la Compra Venta', CF_CATS_POST) + catOptGroup('Otros gastos', CF_CATS_OTROS) + '</select></div>' +
       '</div>' +
       '<div class="field"><label>Concepto</label><input type="text" id="cfGastoConcepto" placeholder="ej. Pintura y acabados" value="' + escapeAttr(g ? g.concepto : '') + '" /></div>' +
       '<div class="field"><label>Monto (S/.)</label><input type="text" id="cfGastoMonto" placeholder="0.00" value="' + (g ? formatAmt(g.monto) : '') + '" /></div>' +
