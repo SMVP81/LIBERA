@@ -508,6 +508,7 @@
   .cf-edit-btn:hover { color: #A88A2E; }
   .cf-name-cell { display: flex; align-items: center; gap: 6px; }
   .cf-name-input { font-family: Arial, sans-serif; font-size: 12px; padding: 3px 6px; border: 1px solid #C9A227; border-radius: 4px; width: 100%; max-width: 220px; }
+  .cf-socio-name-input { font-family: Arial, sans-serif; font-size: 12px; padding: 3px 6px; border: 1px solid #C9A227; border-radius: 4px; width: 100%; max-width: 220px; }
 
   .cf-pill { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: bold; }
   .cf-pill.ok { background: #E1F0E5; color: #1E7A3D; }
@@ -943,8 +944,11 @@
             <div class="cf-split-bar" id="cfSplitBar"></div>
             <div id="cfSplitWarn"></div>
             <table class="cf-fin-table" id="cfRepartoTable"></table>
-            <button class="btn btn-outline cf-btn-sm" style="margin-top:10px;" onclick="cfAddRepartoRow()">+ Agregar socio al reparto</button>
-            <button class="btn btn-outline cf-btn-sm" style="margin-top:10px;" onclick="cfRepartirIgual(cfCurrentProyectoId)">⚖ Repartir en partes iguales</button>
+            <div style="display:flex; gap:6px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+              <select id="cfNuevoRepartoSocio" style="font-family:Arial, sans-serif; font-size:12px; padding:5px 6px; border:1px solid #D6DCE4; border-radius:5px; max-width:200px;"></select>
+              <button class="btn btn-outline cf-btn-sm" id="cfBtnAgregarReparto" onclick="cfAddRepartoRow()">+ Agregar al reparto</button>
+              <button class="btn btn-outline cf-btn-sm" onclick="cfRepartirIgual(cfCurrentProyectoId)">⚖ Repartir en partes iguales</button>
+            </div>
           </div>
           <div class="cf-panel" id="cfFichaVinculadaPanel"></div>
         </div>
@@ -2590,6 +2594,17 @@
     });
     document.getElementById('cfRepartoTable').innerHTML = repRows;
 
+    const disponiblesReparto = cfSocios.filter(s => !(p.reparto || []).some(r => r.socio_id === s.id));
+    const selReparto = document.getElementById('cfNuevoRepartoSocio');
+    const btnReparto = document.getElementById('cfBtnAgregarReparto');
+    if (selReparto) {
+      selReparto.innerHTML = disponiblesReparto.length
+        ? disponiblesReparto.map(s => '<option value="' + s.id + '">' + escapeHtml(s.nombre) + '</option>').join('')
+        : '<option value="">Todos los socios ya están en el reparto</option>';
+      selReparto.disabled = !disponiblesReparto.length;
+    }
+    if (btnReparto) btnReparto.disabled = !disponiblesReparto.length;
+
     const fichaDesactualizada = cfEstimadoDesactualizado(p);
     document.getElementById('cfFichaVinculadaPanel').innerHTML = p.ficha_id
       ? '<h3>Ficha vinculada</h3><p style="font-size:11.5px; color:#5A6B80; line-height:1.5;">Este proyecto está vinculado a la <b>Ficha ' + escapeHtml(cfFichaLabels[p.ficha_id] || '') + '</b> (los montos "Estimado" de arriba son una copia editable — puedes ajustarlos aquí sin que la Ficha te los pise; si la Ficha cambia después, te avisamos abajo).</p>' +
@@ -2653,12 +2668,14 @@
   async function cfAddRepartoRow() {
     const p = cfProyectos.find(x => x.id === cfCurrentProyectoId);
     if (!p) return;
-    const disponible = cfSocios.find(s => !(p.reparto || []).some(r => r.socio_id === s.id));
-    if (!disponible) { showToast('Ya están todos los socios en el reparto'); return; }
+    const sel = document.getElementById('cfNuevoRepartoSocio');
+    const socioId = sel && sel.value;
+    if (!socioId) { showToast('Elige un socio para agregar al reparto'); return; }
+    if ((p.reparto || []).some(r => r.socio_id === socioId)) { showToast('Ese socio ya está en el reparto'); return; }
     // Al agregar un socio, se reparte 100% en partes iguales entre todos los
     // que quedan en la lista (con decimales) — tú puedes seguir editando
     // cualquier % a mano después si el reparto real no es parejo.
-    const nuevaLista = [...(p.reparto || []), { socio_id: disponible.id, pct: 0 }];
+    const nuevaLista = [...(p.reparto || []), { socio_id: socioId, pct: 0 }];
     const pcts = cfPctsIguales(nuevaLista.length);
     const reparto = nuevaLista.map((r, i) => ({ ...r, pct: pcts[i] }));
     p.reparto = reparto;
@@ -2874,12 +2891,68 @@
         const r = (p.reparto || []).find(x => x.socio_id === s.id);
         return sum + cfUtilidadProyecto(p).utilidadNeta * (r ? r.pct : 0) / 100;
       }, 0);
-      rows += '<tr><td><span class="cf-avatar">' + escapeHtml(s.nombre.slice(0, 2).toUpperCase()) + '</span>' + escapeHtml(s.nombre) + '</td>' +
+      rows += '<tr><td><span class="cf-avatar">' + escapeHtml(s.nombre.slice(0, 2).toUpperCase()) + '</span>' +
+        '<span class="cf-name-cell"><span id="cf-socio-name-' + s.id + '">' + escapeHtml(s.nombre) + '</span>' +
+        '<button class="cf-edit-btn" onclick="cfEditarNombreSocio(\'' + s.id + '\')" title="Renombrar">✎</button></span></td>' +
         '<td><span class="cf-pill ' + (s.tipo === 'Socio' ? 'muted' : 'warn') + '">' + escapeHtml(s.tipo) + '</span></td>' +
         '<td>' + proys.length + '</td><td class="num">' + cfFmt(acumulado) + '</td></tr>';
     });
     if (!cfSocios.length) rows += '<tr><td colspan="4" style="color:#97A2B0; font-style:italic;">Sin socios registrados todavía.</td></tr>';
     document.getElementById('cfSociosTable').innerHTML = rows;
+  }
+  function cfEditarNombreSocio(sid) {
+    const openInput = document.querySelector('.cf-socio-name-input');
+    if (openInput) {
+      const openSid = openInput.dataset.sid;
+      if (openSid === sid) { openInput.focus(); return; }
+      cfCommitNombreSocio(openSid, openInput.value);
+    }
+    const s = cfSocios.find(x => x.id === sid);
+    if (!s) return;
+    const span = document.getElementById('cf-socio-name-' + sid);
+    if (!span) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'cf-socio-name-input';
+    input.dataset.sid = sid;
+    input.value = s.nombre;
+    input.onclick = e => e.stopPropagation();
+    input.onkeydown = e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') input.blur();
+      else if (e.key === 'Escape') { input.value = s.nombre; input.blur(); }
+    };
+    input.onblur = () => cfCommitNombreSocio(sid, input.value);
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+  async function cfCommitNombreSocio(sid, val) {
+    const s = cfSocios.find(x => x.id === sid);
+    if (!s) return;
+    const clean = (val || '').trim();
+    const input = document.querySelector('.cf-socio-name-input[data-sid="' + sid + '"]');
+    if (input) {
+      input.onblur = null;
+      const span = document.createElement('span');
+      span.id = 'cf-socio-name-' + sid;
+      span.textContent = clean || s.nombre;
+      input.replaceWith(span);
+    }
+    if (clean && clean !== s.nombre) {
+      s.nombre = clean;
+      try {
+        await db.saveSocioFinanciero({ id: sid, nombre: clean });
+        cfSocios.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        cfRenderSocios(); cfRenderResumen(); cfRenderProyectos(); cfRenderPrestamos();
+        if (cfCurrentProyectoId) cfRenderDetalle();
+        showToast('Nombre actualizado ✓');
+      } catch (err) {
+        console.error(err);
+        showToast('No se pudo guardar el nombre.');
+        cfRenderSocios();
+      }
+    }
   }
   function cfAbrirNuevoSocio() {
     const overlay = document.createElement('div');
