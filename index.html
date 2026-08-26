@@ -536,6 +536,7 @@
   .cf-split-warn.ok { background: #E1F0E5; color: #1E7A3D; }
   .cf-split-warn.bad { background: #FBEAEA; color: #8A2F27; }
   .cf-pct-input { width: 54px; font-family: Arial, sans-serif; font-size: 12px; padding: 4px 6px; border: 1px solid #D6DCE4; border-radius: 5px; text-align: right; }
+  .cf-monto-input { width: 100px; font-family: Arial, sans-serif; font-size: 12px; padding: 4px 6px; border: 1px solid #D6DCE4; border-radius: 5px; text-align: right; }
   .cf-est-input { width: 110px; font-family: Arial, sans-serif; font-size: 12px; padding: 4px 6px; border: 1px solid #D6DCE4; border-radius: 5px; text-align: right; }
 
   .cf-backlink { font-size: 12px; color: #7A5A12; cursor: pointer; margin-bottom: 10px; display: inline-block; }
@@ -2585,10 +2586,11 @@
 
     let repRows = '<tr><th>Socio</th><th>%</th><th>Le corresponde</th><th></th></tr>';
     (p.reparto || []).forEach((r, i) => {
+      const montoCorresponde = u.utilidadNeta * r.pct / 100;
       repRows += '<tr>' +
         '<td style="text-align:left;">' + escapeHtml(cfSocioNombre(r.socio_id)) + '</td>' +
         '<td><input class="cf-pct-input" type="number" step="any" value="' + cfPctDisplayVal(r.pct) + '" onchange="cfCambiarPct(\'' + p.id + '\', ' + i + ', this.value)" /></td>' +
-        '<td>' + cfFmtN(u.utilidadNeta * r.pct / 100) + '</td>' +
+        '<td><input class="cf-monto-input" type="number" step="any" value="' + cfMontoDisplayVal(montoCorresponde) + '" onchange="cfCambiarMonto(\'' + p.id + '\', ' + i + ', this.value)" /></td>' +
         '<td class="rm"><button class="cf-rm-btn" onclick="cfQuitarReparto(\'' + p.id + '\', ' + i + ')">×</button></td>' +
         '</tr>';
     });
@@ -2639,6 +2641,28 @@
     try { await cfPersistProyecto(pid, { reparto }); } catch (err) { console.error(err); showToast('No se pudo guardar.'); }
     cfRenderDetalle();
   }
+  // Permite editar "Le corresponde" en soles directamente: convierte el monto
+  // ingresado a % (sobre la utilidad neta del proyecto) y guarda ESE %, igual
+  // que si lo hubieras escrito en la columna de %. Así el reparto sigue
+  // funcionando por porcentaje internamente (y se mantiene correcto si la
+  // utilidad neta cambia después), pero Samuel puede escribir el monto que
+  // le corresponde a cada socio y que el % se calcule solo.
+  async function cfCambiarMonto(pid, idx, val) {
+    const p = cfProyectos.find(x => x.id === pid);
+    if (!p) return;
+    const u = cfUtilidadProyecto(p);
+    if (!u.utilidadNeta) {
+      showToast('No se puede calcular el % porque la utilidad neta del proyecto es 0.');
+      cfRenderDetalle();
+      return;
+    }
+    const monto = Number(val) || 0;
+    const pct = (monto / u.utilidadNeta) * 100;
+    const reparto = (p.reparto || []).map((r, i) => i === idx ? { ...r, pct } : r);
+    p.reparto = reparto;
+    try { await cfPersistProyecto(pid, { reparto }); } catch (err) { console.error(err); showToast('No se pudo guardar.'); }
+    cfRenderDetalle();
+  }
   async function cfQuitarReparto(pid, idx) {
     const p = cfProyectos.find(x => x.id === pid);
     if (!p) return;
@@ -2664,6 +2688,11 @@
   // menos que el socio lo edite a mano.
   function cfPctDisplayVal(pct) {
     return Math.round((Number(pct) || 0) * 10000) / 10000;
+  }
+  // Igual que cfPctDisplayVal pero para el campo "Le corresponde" en soles —
+  // redondeo a centavos solo para mostrar en el input.
+  function cfMontoDisplayVal(monto) {
+    return Math.round((Number(monto) || 0) * 100) / 100;
   }
   async function cfAddRepartoRow() {
     const p = cfProyectos.find(x => x.id === cfCurrentProyectoId);
