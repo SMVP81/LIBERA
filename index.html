@@ -537,6 +537,22 @@
   .cf-split-warn { font-size: 10.5px; font-weight: bold; padding: 6px 10px; border-radius: 6px; margin: 8px 0; }
   .cf-split-warn.ok { background: #E1F0E5; color: #1E7A3D; }
   .cf-split-warn.bad { background: #FBEAEA; color: #8A2F27; }
+
+  /* ====================================================================
+   * DASHBOARD DE RESULTADOS — prefijo "res-" para no chocar con nada.
+   * Reutiliza .stat/.pipeline-stats/.cf-panel/.cf-table/.cf-pill/.cf-note
+   * que ya existen para Control Financiero/Cartera/Seguimiento.
+   * ================================================================== */
+  .res-toolbar { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; background: #fff; border: 1px solid #E3D9B8; border-radius: 10px; padding: 14px 16px; box-shadow: 0 2px 10px rgba(10,37,69,0.06); }
+  .res-field { display: flex; flex-direction: column; gap: 4px; }
+  .res-field label { font-size: 9.5px; letter-spacing: 0.8px; text-transform: uppercase; color: #7A5A12; font-weight: bold; }
+  .res-toolbar select { font-family: Arial, sans-serif; font-size: 12px; padding: 8px 10px; border: 1px solid #D6DCE4; border-radius: 6px; background: #fff; color: #0A2545; min-width: 120px; }
+  .res-toolbar-nota { font-size: 10px; color: #97A2B0; margin-left: auto; align-self: center; max-width: 280px; text-align: right; line-height: 1.4; }
+  .res-na { color: #B9C2CE; }
+  .res-pos { color: #146C43; font-weight: bold; }
+  .res-neg { color: #8A2F27; font-weight: bold; }
+  .res-reparto-bar { display: flex; height: 16px; width: 140px; border-radius: 4px; overflow: hidden; background: #EEF1F4; }
+  .res-reparto-bar div { font-size: 8px; font-weight: bold; color: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
   /* Los 3 campos de abajo usaban 12px mientras el texto de las tablas donde
      viven (.cf-fin-table td) es 11px — se veían "más grandes" comparados con
      las celdas de al lado. Ahora los 3 quedan en 11px para que peguen con el
@@ -654,6 +670,11 @@
         <div class="icon">💰</div>
         <div class="title">Control Financiero</div>
         <div class="desc">Utilidad real por proyecto, reparto entre socios, préstamos y tipo de cambio.</div>
+      </div>
+      <div class="module-card" id="moduleCardResultados" onclick="showResultadosView()" style="display:none;">
+        <div class="icon">📊</div>
+        <div class="title">Dashboard de Resultados</div>
+        <div class="desc">KPIs, rentabilidad y cumplimiento consolidados, con filtros por año, mes, socio, estado y distrito.</div>
       </div>
       <div class="module-card add-module" onclick="alert('Cuéntame qué módulo necesitas y lo agrego aquí.')">
         <div style="font-size:20px;">+</div>
@@ -989,6 +1010,36 @@
       </div>
       <div class="cf-note">Un solo valor vigente por fecha — todos los proyectos en dólares lo usan automáticamente. No se puede registrar una fecha anterior o igual a la última vigente.</div>
       <div class="cf-panel" style="padding:0;"><table class="cf-table" id="cfTcTable"></table></div>
+    </div>
+  </div>
+
+  <!-- ============ DASHBOARD DE RESULTADOS (solo Socios) ============
+       Usa los mismos cfSocios/cfProyectos y las mismas fórmulas de Control
+       Financiero (cfUtilidadProyecto, cfInteresesCalculados, etc.) — nunca
+       recalcula nada por su cuenta, solo los agrupa distinto (por período,
+       por socio, por distrito). "Fecha de compra" y "Propietario original"
+       se muestran en blanco a propósito: ninguno de los dos existe todavía
+       como campo real en proyectos_financieros ni en oportunidades. -->
+  <div id="view-dashboard-resultados">
+    <div class="section-title">Dashboard de Resultados</div>
+    <div class="cf-note">Rentabilidad y KPIs calculados en vivo con tus proyectos de Control Financiero. "Fecha de compra" y "Propietario original" quedan en blanco porque esos campos todavía no existen en tu base.</div>
+
+    <div class="res-toolbar">
+      <div class="res-field"><label for="resFiltroAnio">Año</label><select id="resFiltroAnio" onchange="resCambiarFiltro('anio', this.value)"></select></div>
+      <div class="res-field"><label for="resFiltroMes">Mes</label><select id="resFiltroMes" onchange="resCambiarFiltro('mes', this.value)"></select></div>
+      <div class="res-field"><label for="resFiltroSocio">Socio</label><select id="resFiltroSocio" onchange="resCambiarFiltro('socio', this.value)"></select></div>
+      <div class="res-field"><label for="resFiltroEstado">Estado</label><select id="resFiltroEstado" onchange="resCambiarFiltro('estado', this.value)"></select></div>
+      <div class="res-field"><label for="resFiltroDistrito">Distrito</label><select id="resFiltroDistrito" onchange="resCambiarFiltro('distrito', this.value)"></select></div>
+      <button class="btn btn-outline" onclick="resLimpiarFiltros()">Limpiar filtros</button>
+      <div class="res-toolbar-nota">Año y Mes solo filtran los inmuebles vendidos, por su fecha de venta. Los activos se muestran siempre. Empiezan en el mes actual — usa "Todos" para ver más historial.</div>
+    </div>
+
+    <div class="pipeline-stats" id="resStatGrid"></div>
+
+    <div class="section-title" id="resTituloProyectos">Proyectos</div>
+    <div class="cf-panel" style="padding:0;">
+      <table class="cf-table" id="resTablaProyectos"></table>
+      <div class="empty-rows" id="resTablaVacia" style="display:none; text-align:center; color:#97A2B0; font-size:12px; padding:30px 10px;">Ningún proyecto coincide con estos filtros. Prueba quitando el filtro de Socio, Estado o Distrito.</div>
     </div>
   </div>
 
@@ -1581,6 +1632,7 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('userBadge').style.display = 'none';
     document.getElementById('appbarActions').innerHTML = '';
@@ -1687,6 +1739,7 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'block';
     document.getElementById('appbarActions').innerHTML =
@@ -1759,10 +1812,12 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     document.getElementById('appbarActions').innerHTML = '';
     document.getElementById('moduleCardFinanciero').style.display = (currentUser && currentUser.role === 'socio') ? '' : 'none';
+    document.getElementById('moduleCardResultados').style.display = (currentUser && currentUser.role === 'socio') ? '' : 'none';
     currentFichaId = null;
     renderFichaList();
   }
@@ -1773,6 +1828,7 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     const volverBtn = fichaVolverProyectoId
@@ -1800,6 +1856,7 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'block';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     document.getElementById('appbarActions').innerHTML =
@@ -1818,6 +1875,7 @@
     document.getElementById('view-pipeline').style.display = 'block';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     document.getElementById('appbarActions').innerHTML =
@@ -1840,6 +1898,7 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'block';
     document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     document.getElementById('appbarActions').innerHTML =
@@ -2107,6 +2166,10 @@
   // si le metiéramos este número ahí, se intentaría guardar en una columna
   // que no existe en la tabla y la grabada fallaría.
   let cfFichaTotalSinBancariosCache = {};
+  // ficha_id -> distrito de esa Ficha — usado por el Dashboard de Resultados
+  // para agrupar "Mejor distrito" (proyectos_financieros no guarda distrito
+  // propio; solo lo tiene la Ficha vinculada, si existe).
+  let cfFichaDistritoCache = {};
   let cfCurrentProyectoId = null;
   let cfCurrentTab = 'resumen';
   let cfEditingGasto = null;
@@ -2130,6 +2193,7 @@
     document.getElementById('view-pipeline').style.display = 'none';
     document.getElementById('view-cartera').style.display = 'none';
     document.getElementById('view-financiero').style.display = 'block';
+    document.getElementById('view-dashboard-resultados').style.display = 'none';
     document.getElementById('view-solicitudes').style.display = 'none';
     document.getElementById('view-auth').style.display = 'none';
     document.getElementById('appbarActions').innerHTML =
@@ -2153,6 +2217,7 @@
     const ids = [...new Set(cfProyectos.filter(p => p.ficha_id).map(p => p.ficha_id))];
     cfFichaLabels = {};
     cfFichaEstimadosCache = {};
+    cfFichaDistritoCache = {};
     await Promise.all(ids.map(async id => {
       try {
         const f = await db.getFicha(id);
@@ -2160,6 +2225,7 @@
           cfFichaLabels[id] = f.triang_id || '(sin código)';
           cfFichaEstimadosCache[id] = fichaValoresEstimados(f);
           cfFichaTotalSinBancariosCache[id] = fichaTotalInversionSinBancarios(f);
+          cfFichaDistritoCache[id] = f.distrito || null;
         }
       } catch (err) { console.error(err); }
     }));
@@ -3504,6 +3570,292 @@
       console.error(err);
       showToast('No se pudo guardar. (¿ya existe un tipo de cambio con esa fecha?)');
     }
+  }
+
+  /* ======================================================================
+   * DASHBOARD DE RESULTADOS — reutiliza cfSocios/cfProyectos y las mismas
+   * fórmulas de Control Financiero (cfUtilidadProyecto, cfInteresesCalculados,
+   * cfSocioNombre, etc.); nunca vuelve a calcular una utilidad o un interés
+   * por su cuenta, solo los agrupa distinto (por período, por socio, por
+   * distrito). "Titular del inmueble" y su Cumplimiento quedan FUERA por
+   * ahora: ese campo todavía no existe en ningún proyecto real (ver el
+   * mockup aparte), así que no hay nada real que mostrar todavía.
+   * ==================================================================== */
+  const RES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const RES_SOCIO_COLORES = ['#0A2545', '#1C3F66', '#C9A227', '#7A5A12', '#3E6B8A'];
+  let resState = { anio: 'Todos', mes: 'Todos', socio: 'Todos', estado: 'Todos', distrito: 'Todos' };
+
+  // Igual que la Ficha de Rentabilidad y proyectos_financieros: una fecha
+  // con un año fuera de rango razonable (p.ej. el typo "0202-10-15" que
+  // existe hoy en un proyecto real) se trata como "sin fecha" para efectos
+  // de Año/Mes, en vez de romper el filtro o inflar un año que no es.
+  function resAnioValido(anio) { return anio && anio >= 2015 && anio <= 2035; }
+  function resAnioDeFecha(str) {
+    if (!str) return null;
+    const a = parseInt(String(str).slice(0, 4), 10);
+    return resAnioValido(a) ? a : null;
+  }
+  function resMesDeFecha(str) {
+    if (!str) return null;
+    const d = new Date(str + 'T00:00:00');
+    if (isNaN(d.getTime()) || !resAnioValido(d.getFullYear())) return null;
+    return d.getMonth() + 1;
+  }
+  function resFmtPct(n) { return (Number(n) || 0).toFixed(1) + '%'; }
+  function resFmtFecha(str) {
+    if (!str) return '—';
+    const d = new Date(str + 'T00:00:00');
+    if (isNaN(d.getTime())) return '—';
+    const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return d.getDate() + ' ' + meses[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function resUnicos(arr) {
+    const vistos = {}; const out = [];
+    arr.forEach(v => { if (v && !vistos[v]) { vistos[v] = true; out.push(v); } });
+    return out.sort();
+  }
+  // proyectos_financieros no guarda distrito propio — solo lo tiene la Ficha
+  // vinculada (si el proyecto tiene una). Sin Ficha vinculada, no hay
+  // distrito que mostrar ni por el que agrupar.
+  function resDistrito(p) { return p.ficha_id ? (cfFichaDistritoCache[p.ficha_id] || null) : null; }
+
+  function resAplicaFiltros(p) {
+    if (resState.socio !== 'Todos' && !(p.reparto || []).some(r => r.socio_id === resState.socio)) return false;
+    if (resState.estado !== 'Todos' && p.estado !== resState.estado) return false;
+    if (resState.distrito !== 'Todos' && resDistrito(p) !== resState.distrito) return false;
+    if (resState.anio !== 'Todos' && resAnioDeFecha(p.fecha_venta) !== resState.anio) return false;
+    if (resState.mes !== 'Todos' && resMesDeFecha(p.fecha_venta) !== resState.mes) return false;
+    return true;
+  }
+  // Igual que resAplicaFiltros pero sin Año/Mes — para "Inmuebles
+  // comprados"/"Inmuebles activos"/"Tasa promedio del préstamo", que no
+  // dependen de cuándo (o si) se vendió algo.
+  function resAplicaFiltrosSinPeriodo(p) {
+    if (resState.socio !== 'Todos' && !(p.reparto || []).some(r => r.socio_id === resState.socio)) return false;
+    if (resState.estado !== 'Todos' && p.estado !== resState.estado) return false;
+    if (resState.distrito !== 'Todos' && resDistrito(p) !== resState.distrito) return false;
+    return true;
+  }
+  // Para la tabla "Proyectos": los inmuebles activos se muestran SIEMPRE (no
+  // tienen fecha de venta que filtrar por Año/Mes), y los vendidos solo si
+  // su fecha de venta cae en el Año/Mes filtrado. Así la tabla nunca
+  // aparece vacía solo porque no se vendió nada exactamente ese mes — antes
+  // "Proyectos" se filtraba igual que "vendidos en el período" y por
+  // defecto (mes actual) podía mostrar 0 filas aunque hubiera inmuebles
+  // activos.
+  function resAplicaFiltrosTabla(p) {
+    if (!resAplicaFiltrosSinPeriodo(p)) return false;
+    if (p.estado !== 'Vendido') return true;
+    if (resState.anio !== 'Todos' && resAnioDeFecha(p.fecha_venta) !== resState.anio) return false;
+    if (resState.mes !== 'Todos' && resMesDeFecha(p.fecha_venta) !== resState.mes) return false;
+    return true;
+  }
+
+  async function showResultadosView() {
+    document.getElementById('view-dashboard').style.display = 'none';
+    document.getElementById('view-ficha').style.display = 'none';
+    document.getElementById('view-pipeline').style.display = 'none';
+    document.getElementById('view-cartera').style.display = 'none';
+    document.getElementById('view-financiero').style.display = 'none';
+    document.getElementById('view-solicitudes').style.display = 'none';
+    document.getElementById('view-auth').style.display = 'none';
+    document.getElementById('view-dashboard-resultados').style.display = 'block';
+    document.getElementById('appbarActions').innerHTML =
+      '<button class="btn btn-outline" onclick="goDashboard()">← Inicio</button>';
+    try {
+      cfSocios = await db.listSociosFinancieros();
+      cfProyectos = await db.listProyectosFinancieros();
+      await cfLoadFichaLabels();
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo cargar el Dashboard de Resultados.');
+      cfSocios = []; cfProyectos = [];
+    }
+    const hoy = new Date();
+    resState = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, socio: 'Todos', estado: 'Todos', distrito: 'Todos' };
+    resRender();
+  }
+
+  function resCambiarFiltro(campo, valor) {
+    if (campo === 'anio' || campo === 'mes') {
+      resState[campo] = valor === 'Todos' ? 'Todos' : Number(valor);
+    } else {
+      resState[campo] = valor;
+    }
+    resRender();
+  }
+  function resLimpiarFiltros() {
+    const hoy = new Date();
+    resState = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, socio: 'Todos', estado: 'Todos', distrito: 'Todos' };
+    resRender();
+  }
+
+  // Clic en una fila de "Proyectos" → abre ese proyecto en el Detalle de
+  // Control Financiero, igual que la tabla de Resumen. cfAbrirDetalle() por
+  // sí sola no cambia de vista (solo cambia de pestaña DENTRO de Control
+  // Financiero), así que primero hay que mostrar view-financiero.
+  async function resAbrirDetalle(pid) {
+    await showFinancieroView();
+    cfAbrirDetalle(pid);
+  }
+
+  function resLlenarSelect(select, opciones, valorActual) {
+    select.innerHTML = '';
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value; opt.textContent = o.label;
+      select.appendChild(opt);
+    });
+    select.value = String(valorActual);
+  }
+
+  function resStatCard(cls, lbl, val, sub) {
+    return '<div class="stat ' + cls + '"><div class="lbl">' + escapeHtml(lbl) + '</div><div class="val">' + escapeHtml(val) + '</div><div class="sub">' + escapeHtml(sub) + '</div></div>';
+  }
+
+  function resRender() {
+    if (!cfProyectos.length) {
+      document.getElementById('resStatGrid').innerHTML = '';
+      document.getElementById('resTituloProyectos').textContent = 'Proyectos';
+      document.getElementById('resTablaProyectos').innerHTML = '';
+      document.getElementById('resTablaVacia').style.display = 'block';
+      document.getElementById('resTablaVacia').textContent = 'Todavía no hay proyectos en Control Financiero — crea el primero ahí para ver el Dashboard.';
+      // Aunque no haya proyectos, los <select> del toolbar no deben quedar
+      // en blanco (sin ninguna opción) — al menos "Todos" en cada uno.
+      const hoyVacio = new Date();
+      resLlenarSelect(document.getElementById('resFiltroAnio'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
+      resLlenarSelect(document.getElementById('resFiltroMes'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
+      resLlenarSelect(document.getElementById('resFiltroSocio'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
+      resLlenarSelect(document.getElementById('resFiltroEstado'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
+      resLlenarSelect(document.getElementById('resFiltroDistrito'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
+      return;
+    }
+    document.getElementById('resTablaVacia').textContent = 'Ningún proyecto coincide con estos filtros. Prueba quitando el filtro de Socio, Estado o Distrito.';
+
+    const filtrados = cfProyectos.filter(resAplicaFiltros);
+    const calc = {};
+    cfProyectos.forEach(p => { calc[p.id] = cfUtilidadProyecto(p); });
+    const vendidosFiltrados = filtrados.filter(p => p.estado === 'Vendido');
+    const carteraSinPeriodo = cfProyectos.filter(resAplicaFiltrosSinPeriodo);
+    const activosSinPeriodo = carteraSinPeriodo.filter(p => p.estado !== 'Vendido');
+
+    // "rentTotal" es la utilidad neta COMPLETA (100%) de los inmuebles
+    // vendidos en el período — se usa para "Interés como % de la ganancia"
+    // y "Mejor distrito", que son métricas del NEGOCIO, no de una persona.
+    // "gananciaMostrada" es lo que se pinta en "Ganancia del período": si
+    // filtras por un Socio en concreto, es SU parte del reparto en cada
+    // inmueble, no el 100% del inmueble completo.
+    let rentTotal = 0, gananciaMostrada = 0, sumRentPct = 0, sumIntereses = 0;
+    const porDistrito = {};
+    vendidosFiltrados.forEach(p => {
+      const c = calc[p.id];
+      const rentPct = c.rentNeta * 100;
+      rentTotal += c.utilidadNeta;
+      sumRentPct += rentPct;
+      sumIntereses += c.interesesReal;
+      if (resState.socio !== 'Todos') {
+        const repartoSocio = (p.reparto || []).find(r => r.socio_id === resState.socio);
+        gananciaMostrada += repartoSocio ? c.utilidadNeta * (Number(repartoSocio.pct) / 100) : 0;
+      } else {
+        gananciaMostrada += c.utilidadNeta;
+      }
+      const d = resDistrito(p);
+      if (d) {
+        if (!porDistrito[d]) porDistrito[d] = { suma: 0, cuenta: 0 };
+        porDistrito[d].suma += rentPct;
+        porDistrito[d].cuenta += 1;
+      }
+    });
+    const n = vendidosFiltrados.length;
+    let mejorDistritoNombre = '—', mejorDistritoValor = '—';
+    let mejorProm = -Infinity;
+    Object.keys(porDistrito).forEach(d => {
+      const prom = porDistrito[d].suma / porDistrito[d].cuenta;
+      if (prom > mejorProm) { mejorProm = prom; mejorDistritoNombre = d; }
+    });
+    if (mejorDistritoNombre !== '—') mejorDistritoValor = resFmtPct(mejorProm);
+
+    // OJO: esto NO es la tasa de interés (el interés en soles ya se calculó
+    // bien, sobre el capital prestado — ver cfInteresPrestamo). Es un
+    // cociente distinto: de todo lo que generó el negocio (ganancia +
+    // interés), qué parte se fue en financiamiento.
+    const interesPctGanancia = (rentTotal + sumIntereses) > 0 ? (sumIntereses / (rentTotal + sumIntereses) * 100) : 0;
+
+    // Tasa promedio del préstamo, ponderada por el monto de cada uno (no un
+    // simple promedio de tasas) — sobre la cartera filtrada sin Año/Mes,
+    // porque la tasa de un préstamo no depende de cuándo se vendió el
+    // inmueble.
+    let sumaMontoPrestado = 0, sumaMontoPorTasa = 0;
+    carteraSinPeriodo.forEach(p => {
+      (p.prestamos || []).forEach(pr => {
+        const monto = Number(pr.monto) || 0;
+        const tasa = Number(pr.tasa) || 0;
+        sumaMontoPrestado += monto;
+        sumaMontoPorTasa += monto * tasa;
+      });
+    });
+    const tasaPromedio = sumaMontoPrestado > 0 ? (sumaMontoPorTasa / sumaMontoPrestado) : null;
+
+    const nombreSocioFiltrado = resState.socio !== 'Todos' ? cfSocioNombre(resState.socio) : null;
+    const ganLabel = nombreSocioFiltrado ? 'Ganancia del período (tu parte)' : 'Ganancia del período';
+    const ganSub = nombreSocioFiltrado
+      ? (nombreSocioFiltrado + ': tu % de reparto en ' + n + ' inmueble(s) vendido(s)')
+      : (n + ' inmueble(s) vendido(s) en el período');
+
+    document.getElementById('resStatGrid').innerHTML =
+      resStatCard('gold', ganLabel, n ? cfFmt(gananciaMostrada) : '—', ganSub) +
+      resStatCard('white', 'Rentabilidad promedio', n ? resFmtPct(sumRentPct / n) : '—', 'sobre el precio de venta') +
+      resStatCard('white', 'Inmuebles comprados', String(carteraSinPeriodo.length), 'total histórico, según los filtros de arriba') +
+      resStatCard('white', 'Inmuebles vendidos', String(n), 'en el período filtrado') +
+      resStatCard('white', 'Inmuebles activos', String(activosSinPeriodo.length), 'en compra, remodelación o en venta ahora') +
+      resStatCard('white', 'Interés como % de la ganancia', n ? resFmtPct(interesPctGanancia) : '—', 'del total generado (ganancia + interés) se fue en intereses') +
+      resStatCard('white', 'Tasa promedio del préstamo', tasaPromedio !== null ? resFmtPct(tasaPromedio) : '—', 'ponderada por el monto de cada préstamo activo') +
+      resStatCard('navy', 'Mejor distrito', mejorDistritoNombre, mejorDistritoValor + ' de rentabilidad promedio en el período');
+
+    const filas = cfProyectos.filter(resAplicaFiltrosTabla).map(p => {
+      const c = calc[p.id];
+      const reparto = (p.reparto || []).map(r => ({ nombre: cfSocioNombre(r.socio_id), pct: Number(r.pct) || 0 }));
+      const barSegs = reparto.map((r, i) =>
+        '<div style="width:' + Math.max(r.pct, 4) + '%; background:' + RES_SOCIO_COLORES[i % RES_SOCIO_COLORES.length] + ';">' + (r.pct >= 12 ? Math.round(r.pct) + '%' : '') + '</div>'
+      ).join('');
+      const repartoTitulo = reparto.length
+        ? reparto.map(r => r.nombre + ': ' + r.pct.toFixed(1) + '% (' + (c.utilidadNeta ? cfFmt(c.utilidadNeta * r.pct / 100) : 'S/. 0') + ')').join(' · ')
+        : 'Sin reparto asignado';
+      const estadoCls = p.estado === 'Vendido' ? 'ok' : p.estado === 'En venta' ? 'warn' : 'muted';
+      const utilCls = c.utilidadNeta < 0 ? 'res-neg' : 'res-pos';
+      return '<tr class="clickable" onclick="resAbrirDetalle(\'' + p.id + '\')">' +
+        '<td>' + escapeHtml(p.nombre) + '</td>' +
+        '<td><span class="cf-pill ' + estadoCls + '">' + escapeHtml(p.estado) + '</span></td>' +
+        '<td class="res-na">—</td>' +
+        '<td class="res-na">—</td>' +
+        '<td>' + escapeHtml(resFmtFecha(p.fecha_venta)) + '</td>' +
+        '<td class="num ' + utilCls + '">' + cfFmt(c.utilidadNeta) + '</td>' +
+        '<td class="num">' + resFmtPct(c.rentNeta * 100) + '</td>' +
+        '<td class="num">' + cfFmt(c.interesesReal) + '</td>' +
+        '<td><div class="res-reparto-bar" title="' + escapeHtml(repartoTitulo) + '">' + (barSegs || '<span class="res-na">Sin asignar</span>') + '</div></td>' +
+        '</tr>';
+    });
+
+    document.getElementById('resTituloProyectos').textContent = 'Proyectos (' + filas.length + ')';
+    const tabla = document.getElementById('resTablaProyectos');
+    const vacia = document.getElementById('resTablaVacia');
+    if (filas.length) {
+      vacia.style.display = 'none';
+      tabla.innerHTML = '<tr><th>Proyecto</th><th>Estado</th><th>Fecha compra</th><th>Propietario original</th><th>Fecha venta</th><th class="num">Rentabilidad total</th><th class="num">Rent. neta</th><th class="num">Intereses</th><th>Reparto por socio</th></tr>' + filas.join('');
+    } else {
+      tabla.innerHTML = '';
+      vacia.style.display = 'block';
+    }
+
+    const aniosDisponibles = resUnicos(cfProyectos.map(p => resAnioDeFecha(p.fecha_venta)).filter(Boolean));
+    const hoy = new Date();
+    if (aniosDisponibles.indexOf(hoy.getFullYear()) === -1) aniosDisponibles.push(hoy.getFullYear());
+    aniosDisponibles.sort((a, b) => b - a);
+    resLlenarSelect(document.getElementById('resFiltroAnio'), [{ value: 'Todos', label: 'Todos' }].concat(aniosDisponibles.map(a => ({ value: a, label: String(a) }))), resState.anio);
+    resLlenarSelect(document.getElementById('resFiltroMes'), [{ value: 'Todos', label: 'Todos' }].concat(RES_MESES.map((m, i) => ({ value: i + 1, label: m }))), resState.mes);
+    resLlenarSelect(document.getElementById('resFiltroSocio'), [{ value: 'Todos', label: 'Todos' }].concat(cfSocios.map(s => ({ value: s.id, label: s.nombre }))), resState.socio);
+    resLlenarSelect(document.getElementById('resFiltroEstado'), [{ value: 'Todos', label: 'Todos' }].concat(CF_ESTADOS.map(e => ({ value: e, label: e }))), resState.estado);
+    resLlenarSelect(document.getElementById('resFiltroDistrito'), [{ value: 'Todos', label: 'Todos' }].concat(resUnicos(cfProyectos.map(resDistrito)).map(d => ({ value: d, label: d }))), resState.distrito);
   }
 
   async function newFicha() {
