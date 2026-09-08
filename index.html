@@ -1031,6 +1031,7 @@
       <div class="res-field"><label for="resFiltroSocio">Socio</label><select id="resFiltroSocio" onchange="resCambiarFiltro('socio', this.value)"></select></div>
       <div class="res-field"><label for="resFiltroEstado">Estado</label><select id="resFiltroEstado" onchange="resCambiarFiltro('estado', this.value)"></select></div>
       <div class="res-field"><label for="resFiltroDistrito">Distrito</label><select id="resFiltroDistrito" onchange="resCambiarFiltro('distrito', this.value)"></select></div>
+      <div class="res-field"><label for="resFiltroTitular">Titular</label><select id="resFiltroTitular" onchange="resCambiarFiltro('titular', this.value)"></select></div>
       <button class="btn btn-outline" onclick="resLimpiarFiltros()">Limpiar filtros</button>
       <div class="res-toolbar-nota">Año y Mes solo filtran los inmuebles vendidos, por su fecha de venta. Los activos se muestran siempre. Empiezan en el mes actual — usa "Todos" para ver más historial.</div>
     </div>
@@ -1385,6 +1386,7 @@
     let memProyectosFinancieros = [
       {
         id: 'demo-pf-1', nombre: '1. Proyecto de ejemplo', estado: 'En venta', ficha_id: null, oportunidad_id: null,
+        fecha_compra: '2026-01-15', titular_id: null,
         est_compra: 150000, est_gastos_compra: 8000, est_gastos_post: 6000, est_precio_venta: 210000, est_agente_pct: 3, est_impuesto_pct: 5,
         reparto: [ { socio_id: 'demo-sf-1', pct: 60 }, { socio_id: 'demo-sf-2', pct: 40 } ],
         gastos: [
@@ -1394,7 +1396,12 @@
         prestamos: [], sort_order: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       },
       {
+        // fecha_venta '2025-12-15': antes esta fila no tenía fecha de venta
+        // (un quirk de los datos demo, no algo intencional) — se corrige acá
+        // para poder probar de verdad "Días promedio en venderse" con un par
+        // de fechas válido (compra 2025-06-01 → venta 2025-12-15 = 197 días).
         id: 'demo-pf-2', nombre: '2. Segundo proyecto de ejemplo', estado: 'Vendido', ficha_id: null, oportunidad_id: null,
+        fecha_compra: '2025-06-01', fecha_venta: '2025-12-15', titular_id: null,
         est_compra: 220000, est_gastos_compra: 12000, est_gastos_post: 9000, est_precio_venta: 300000, est_agente_pct: 3, est_impuesto_pct: 5,
         reparto: [ { socio_id: 'demo-sf-3', pct: 100 } ],
         gastos: [
@@ -3698,7 +3705,7 @@
    * ==================================================================== */
   const RES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const RES_SOCIO_COLORES = ['#0A2545', '#1C3F66', '#C9A227', '#7A5A12', '#3E6B8A'];
-  let resState = { anio: 'Todos', mes: 'Todos', socio: 'Todos', estado: 'Todos', distrito: 'Todos' };
+  let resState = { anio: 'Todos', mes: 'Todos', socio: 'Todos', estado: 'Todos', distrito: 'Todos', titular: 'Todos' };
 
   // Igual que la Ficha de Rentabilidad y proyectos_financieros: una fecha
   // con un año fuera de rango razonable (p.ej. el typo "0202-10-15" que
@@ -3734,10 +3741,29 @@
   // distrito que mostrar ni por el que agrupar.
   function resDistrito(p) { return p.ficha_id ? (cfFichaDistritoCache[p.ficha_id] || null) : null; }
 
+  // Días entre compra y venta de UN inmueble — null si falta cualquiera de
+  // las dos fechas, si alguna es inválida, o si da un typo tipo el real
+  // "0202-10-15" (mismo criterio resAnioValido que ya usa todo el Dashboard),
+  // o si la venta queda antes o el mismo día que la compra (error de carga).
+  // A propósito NO usa cfDiasEntre(): esa función, pensada para intereses de
+  // préstamo, cae a "hoy" si la fecha de fin es inválida — acá eso inflaría
+  // con basura la antigüedad de un inmueble activo como si ya se hubiera
+  // vendido hoy mismo.
+  function resDiasVenta(p) {
+    if (!p.fecha_compra || !p.fecha_venta) return null;
+    const c = new Date(p.fecha_compra + 'T00:00:00');
+    const v = new Date(p.fecha_venta + 'T00:00:00');
+    if (isNaN(c.getTime()) || isNaN(v.getTime())) return null;
+    if (!resAnioValido(c.getFullYear()) || !resAnioValido(v.getFullYear())) return null;
+    const dias = Math.round((v.getTime() - c.getTime()) / 86400000);
+    return dias > 0 ? dias : null;
+  }
+
   function resAplicaFiltros(p) {
     if (resState.socio !== 'Todos' && !(p.reparto || []).some(r => r.socio_id === resState.socio)) return false;
     if (resState.estado !== 'Todos' && p.estado !== resState.estado) return false;
     if (resState.distrito !== 'Todos' && resDistrito(p) !== resState.distrito) return false;
+    if (resState.titular !== 'Todos' && p.titular_id !== resState.titular) return false;
     if (resState.anio !== 'Todos' && resAnioDeFecha(p.fecha_venta) !== resState.anio) return false;
     if (resState.mes !== 'Todos' && resMesDeFecha(p.fecha_venta) !== resState.mes) return false;
     return true;
@@ -3749,6 +3775,7 @@
     if (resState.socio !== 'Todos' && !(p.reparto || []).some(r => r.socio_id === resState.socio)) return false;
     if (resState.estado !== 'Todos' && p.estado !== resState.estado) return false;
     if (resState.distrito !== 'Todos' && resDistrito(p) !== resState.distrito) return false;
+    if (resState.titular !== 'Todos' && p.titular_id !== resState.titular) return false;
     return true;
   }
   // Para la tabla "Proyectos": los inmuebles activos se muestran SIEMPRE (no
@@ -3788,7 +3815,7 @@
       cfSocios = []; cfTitulares = []; cfProyectos = [];
     }
     const hoy = new Date();
-    resState = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, socio: 'Todos', estado: 'Todos', distrito: 'Todos' };
+    resState = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, socio: 'Todos', estado: 'Todos', distrito: 'Todos', titular: 'Todos' };
     resRender();
   }
 
@@ -3802,7 +3829,7 @@
   }
   function resLimpiarFiltros() {
     const hoy = new Date();
-    resState = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, socio: 'Todos', estado: 'Todos', distrito: 'Todos' };
+    resState = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, socio: 'Todos', estado: 'Todos', distrito: 'Todos', titular: 'Todos' };
     resRender();
   }
 
@@ -3844,6 +3871,7 @@
       resLlenarSelect(document.getElementById('resFiltroSocio'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
       resLlenarSelect(document.getElementById('resFiltroEstado'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
       resLlenarSelect(document.getElementById('resFiltroDistrito'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
+      resLlenarSelect(document.getElementById('resFiltroTitular'), [{ value: 'Todos', label: 'Todos' }], 'Todos');
       return;
     }
     document.getElementById('resTablaVacia').textContent = 'Ningún proyecto coincide con estos filtros. Prueba quitando el filtro de Socio, Estado o Distrito.';
@@ -3883,6 +3911,14 @@
       }
     });
     const n = vendidosFiltrados.length;
+    // "Días promedio en venderse": solo cuenta con las ventas del período
+    // filtrado que YA tienen Fecha de compra cargada (un campo nuevo — la
+    // mayoría de tus ventas históricas todavía no la tienen). Por eso el sub
+    // texto siempre dice cuántas de las N ventas entraron al promedio: un
+    // promedio de 1 o 2 casos no es lo mismo que uno de 10, y esconder ese
+    // conteo daría una falsa sensación de certeza.
+    const diasPorVenta = vendidosFiltrados.map(resDiasVenta).filter(d => d !== null);
+    const diasPromedioVenta = diasPorVenta.length ? Math.round(diasPorVenta.reduce((s, d) => s + d, 0) / diasPorVenta.length) : null;
     let mejorDistritoNombre = '—', mejorDistritoValor = '—';
     let mejorProm = -Infinity;
     Object.keys(porDistrito).forEach(d => {
@@ -3921,6 +3957,8 @@
     document.getElementById('resStatGrid').innerHTML =
       resStatCard('gold', ganLabel, n ? cfFmt(gananciaMostrada) : '—', ganSub) +
       resStatCard('white', 'Rentabilidad promedio', n ? resFmtPct(sumRentPct / n) : '—', 'sobre el precio de venta') +
+      resStatCard('white', 'Días promedio en venderse', diasPromedioVenta !== null ? String(diasPromedioVenta) + ' días' : '—',
+        diasPorVenta.length ? ('de compra a venta · ' + diasPorVenta.length + ' de ' + n + ' vendido(s) con Fecha de compra cargada') : (n ? 'ninguno de los ' + n + ' vendido(s) del período tiene Fecha de compra cargada' : 'sin ventas en el período')) +
       resStatCard('white', 'Inmuebles comprados', String(carteraSinPeriodo.length), 'total histórico, según los filtros de arriba') +
       resStatCard('white', 'Inmuebles vendidos', String(n), 'en el período filtrado') +
       resStatCard('white', 'Inmuebles activos', String(activosSinPeriodo.length), 'en compra, remodelación o en venta ahora') +
@@ -3930,9 +3968,19 @@
 
     const filas = cfProyectos.filter(resAplicaFiltrosTabla).map(p => {
       const c = calc[p.id];
-      const reparto = (p.reparto || []).map(r => ({ nombre: cfSocioNombre(r.socio_id), pct: Number(r.pct) || 0 }));
-      const barSegs = reparto.map((r, i) =>
-        '<div style="width:' + Math.max(r.pct, 4) + '%; background:' + RES_SOCIO_COLORES[i % RES_SOCIO_COLORES.length] + ';">' + (r.pct >= 12 ? Math.round(r.pct) + '%' : '') + '</div>'
+      // El color de cada segmento se fija por la posición del socio en
+      // cfSocios (catálogo global, orden alfabético) — no por su posición
+      // DENTRO del reparto de este proyecto. Así el mismo socio siempre
+      // pinta del mismo color en todas las filas; antes un socio podía salir
+      // azul en un proyecto y dorado en otro solo porque el orden en que se
+      // cargó su % variaba de proyecto a proyecto.
+      const reparto = (p.reparto || []).map(r => ({
+        nombre: cfSocioNombre(r.socio_id),
+        pct: Number(r.pct) || 0,
+        colorIdx: Math.max(0, cfSocios.findIndex(s => s.id === r.socio_id)),
+      }));
+      const barSegs = reparto.map(r =>
+        '<div style="width:' + Math.max(r.pct, 4) + '%; background:' + RES_SOCIO_COLORES[r.colorIdx % RES_SOCIO_COLORES.length] + ';">' + (r.pct >= 12 ? Math.round(r.pct) + '%' : '') + '</div>'
       ).join('');
       const repartoTitulo = reparto.length
         ? reparto.map(r => r.nombre + ': ' + r.pct.toFixed(1) + '% (' + (c.utilidadNeta ? cfFmt(c.utilidadNeta * r.pct / 100) : 'S/. 0') + ')').join(' · ')
@@ -3974,6 +4022,10 @@
     resLlenarSelect(document.getElementById('resFiltroSocio'), [{ value: 'Todos', label: 'Todos' }].concat(cfSocios.map(s => ({ value: s.id, label: s.nombre }))), resState.socio);
     resLlenarSelect(document.getElementById('resFiltroEstado'), [{ value: 'Todos', label: 'Todos' }].concat(CF_ESTADOS.map(e => ({ value: e, label: e }))), resState.estado);
     resLlenarSelect(document.getElementById('resFiltroDistrito'), [{ value: 'Todos', label: 'Todos' }].concat(resUnicos(cfProyectos.map(resDistrito)).map(d => ({ value: d, label: d }))), resState.distrito);
+    // Solo ofrece titulares que ya están asignados a algún proyecto — no
+    // tiene sentido dejar filtrar por alguien que todavía no compró nada.
+    const titularesConProyecto = cfTitulares.filter(t => cfProyectos.some(p => p.titular_id === t.id));
+    resLlenarSelect(document.getElementById('resFiltroTitular'), [{ value: 'Todos', label: 'Todos' }].concat(titularesConProyecto.map(t => ({ value: t.id, label: t.nombre }))), resState.titular);
   }
 
   async function newFicha() {
