@@ -1033,7 +1033,7 @@
       <div class="res-field"><label for="resFiltroDistrito">Distrito</label><select id="resFiltroDistrito" onchange="resCambiarFiltro('distrito', this.value)"></select></div>
       <div class="res-field"><label for="resFiltroTitular">Titular</label><select id="resFiltroTitular" onchange="resCambiarFiltro('titular', this.value)"></select></div>
       <button class="btn btn-outline" onclick="resLimpiarFiltros()">Limpiar filtros</button>
-      <div class="res-toolbar-nota">Año y Mes solo filtran los inmuebles vendidos, por su fecha de venta — por eso tarjetas como "Inmuebles comprados" o "Inmuebles activos" no cambian al mover Año/Mes (sí cambian con Socio, Estado, Distrito o Titular). Los activos se muestran siempre en la tabla. Año/Mes empiezan en el mes actual — usa "Todos" para ver más historial.</div>
+      <div class="res-toolbar-nota">Año y Mes filtran los inmuebles vendidos por su fecha de venta; los activos siempre se incluyen. "Inmuebles comprados" y la tabla usan esa misma regla, así que siempre coinciden. "Inmuebles activos" y "Tasa promedio del préstamo" no cambian con Año/Mes (no dependen de cuándo se vendió). Año/Mes empiezan en el mes actual — usa "Todos" para ver todo el historial.</div>
     </div>
 
     <div class="pipeline-stats" id="resStatGrid"></div>
@@ -3882,6 +3882,13 @@
     const vendidosFiltrados = filtrados.filter(p => p.estado === 'Vendido');
     const carteraSinPeriodo = cfProyectos.filter(resAplicaFiltrosSinPeriodo);
     const activosSinPeriodo = carteraSinPeriodo.filter(p => p.estado !== 'Vendido');
+    // "Inmuebles comprados" se muestra según los MISMOS filtros que la tabla
+    // de abajo (resAplicaFiltrosTabla: activos siempre + vendidos que caen en
+    // el Año/Mes elegido) — así el número de la tarjeta SIEMPRE coincide con
+    // "Proyectos (N)" y con lo que realmente ves en la tabla. Antes usaba
+    // carteraSinPeriodo (ignoraba Año/Mes por completo) y eso confundía a
+    // Samuel: con Año=2026 la tabla mostraba 13 pero la tarjeta seguía en 15.
+    const carteraSegunTabla = cfProyectos.filter(resAplicaFiltrosTabla);
 
     // "rentTotal" es la utilidad neta COMPLETA (100%) de los inmuebles
     // vendidos en el período — se usa para "Interés como % de la ganancia"
@@ -3963,14 +3970,14 @@
       resStatCard('white', 'Rentabilidad promedio', n ? resFmtPct(sumRentPct / n) : '—', 'sobre el precio de venta') +
       resStatCard('white', 'Días promedio en venderse', mesesPromedioVenta !== null ? mesesPromedioVenta.toFixed(1) + ' meses' : '—',
         diasPorVenta.length ? ('de compra a venta (~' + diasPromedioVenta + ' días) · ' + diasPorVenta.length + ' de ' + n + ' vendido(s) con Fecha de compra cargada') : (n ? 'ninguno de los ' + n + ' vendido(s) del período tiene Fecha de compra cargada' : 'sin ventas en el período')) +
-      resStatCard('white', 'Inmuebles comprados', String(carteraSinPeriodo.length), 'total histórico · no cambia con Año/Mes (usa Socio, Estado, Distrito o Titular)') +
+      resStatCard('white', 'Inmuebles comprados', String(carteraSegunTabla.length), resState.anio === 'Todos' && resState.mes === 'Todos' ? 'total histórico según los filtros de arriba' : 'activos + vendidos del período · coincide con "Proyectos" de la tabla') +
       resStatCard('white', 'Inmuebles vendidos', String(n), 'en el período filtrado (sí responde a Año/Mes)') +
       resStatCard('white', 'Inmuebles activos', String(activosSinPeriodo.length), 'en compra, remodelación o en venta ahora · no cambia con Año/Mes') +
       resStatCard('white', 'Interés como % de la ganancia', n ? resFmtPct(interesPctGanancia) : '—', 'del total generado (ganancia + interés) se fue en intereses') +
       resStatCard('white', 'Tasa promedio del préstamo', tasaPromedio !== null ? resFmtPct(tasaPromedio) : '—', 'ponderada por el monto de cada préstamo activo · no cambia con Año/Mes') +
       resStatCard('navy', 'Mejor distrito', mejorDistritoNombre, mejorDistritoValor + ' de rentabilidad promedio en el período');
 
-    const filas = cfProyectos.filter(resAplicaFiltrosTabla).map(p => {
+    const filas = carteraSegunTabla.map(p => {
       const c = calc[p.id];
       // El color de cada segmento se fija por la posición del socio en
       // cfSocios (catálogo global, orden alfabético) — no por su posición
