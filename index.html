@@ -362,6 +362,29 @@
   .acm-ia-hint { font-size: 9.5px; color: #97A2B0; margin: 4px 0 0; }
   #btnBuscarAcmIA { margin-left: 6px; }
   #btnBuscarAcmIA:disabled { opacity: 0.6; cursor: wait; }
+  .acm-ia-panel { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #C7CFDA; }
+  .acm-ia-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; font-size: 11px; }
+  .acm-ia-count { font-size: 11px; color: #33465e; font-weight: bold; }
+  .acm-ia-sort { font-size: 10.5px; color: #5A6B80; }
+  .acm-ia-sort select { font-size: 10.5px; margin-left: 4px; }
+  table.acm-ia-table th, table.acm-ia-table td { font-size: 10px; }
+  table.acm-ia-table td.acm-ia-check { text-align: center; padding: 4px 2px; }
+  tr.acm-ia-row.is-outlier td { background: #FDEFE6; }
+  tr.acm-ia-row.is-unselected { opacity: 0.55; }
+  .acm-ia-badge { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 9px; font-weight: bold; }
+  .acm-ia-badge.alto { background: #DFF3E3; color: #146C43; }
+  .acm-ia-badge.medio { background: #FBF0DA; color: #8a5a12; }
+  .acm-ia-badge.bajo { background: #F4E3E3; color: #8a1212; }
+  .acm-ia-outlier-flag { font-size: 9px; color: #c0392b; margin-left: 3px; }
+  .acm-ia-ajustes { display: flex; gap: 16px; flex-wrap: wrap; font-size: 10.5px; color: #33465e; margin: 10px 0; }
+  .acm-ia-ajustes input { width: 46px; font-size: 10.5px; padding: 2px 4px; }
+  .acm-ia-resultado { margin-top: 10px; }
+  .acm-ia-resultado .acm-ia-valor-box { background: #F0F6FF; border: 1px solid #C9DCF5; border-radius: 7px; padding: 10px 12px; font-size: 11.5px; color: #1b3a5e; }
+  .acm-ia-resultado .acm-ia-valor-box b.price { color: #146C43; font-size: 13px; }
+  .acm-ia-confianza { font-size: 10px; padding: 1px 7px; border-radius: 9px; font-weight: bold; margin-left: 6px; }
+  .acm-ia-confianza.alto { background: #DFF3E3; color: #146C43; }
+  .acm-ia-confianza.medio { background: #FBF0DA; color: #8a5a12; }
+  .acm-ia-confianza.bajo { background: #F4E3E3; color: #8a1212; }
   .docs-list-header { display: flex; gap: 8px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; color: #8a95a3; padding: 0 10px; margin-top: 8px; }
   .docs-list-header span:nth-child(1) { flex: 1; min-width: 120px; }
   .docs-list-header span:nth-child(2) { width: 170px; }
@@ -809,8 +832,49 @@
           </div>
           <button class="btn-small" onclick="addAcmRow()">+ Agregar comparable</button>
           <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar comparables con IA</button>
-          <div class="acm-ia-hint">Usa la dirección, distrito, tipo y metraje de arriba. Cada búsqueda tiene un costo pequeño (API de Anthropic) — revisa siempre la fuente de cada comparable antes de usarlo.</div>
+          <div class="acm-ia-hint">Usa la dirección, distrito, tipo y metraje de arriba. Cada búsqueda tiene un costo pequeño (API de Anthropic) — revisa siempre la fuente de cada candidato antes de usarlo.</div>
           <div class="acm-summary" id="acmSummary"></div>
+
+          <div class="acm-ia-panel no-print" id="acmIaPanel" style="display:none;">
+            <div class="photos-title" style="margin-top:0;">🔎 Candidatos encontrados por IA</div>
+            <div class="acm-hint" id="acmIaNota"></div>
+            <div class="acm-ia-toolbar">
+              <button class="btn-small" onclick="acmIaSeleccionarTodas(true)">Seleccionar todas</button>
+              <button class="btn-small" onclick="acmIaSeleccionarTodas(false)">Deseleccionar todas</button>
+              <span class="acm-ia-count" id="acmIaCount"></span>
+              <label class="acm-ia-sort">Ordenar por:
+                <select id="acmIaOrden" onchange="renderAcmIaTabla()">
+                  <option value="similitud">Similitud</option>
+                  <option value="precio">Precio</option>
+                  <option value="pm2">S//m² equivalente</option>
+                  <option value="ubicacion">Cercanía</option>
+                </select>
+              </label>
+            </div>
+            <div class="acm-table-wrap">
+              <table class="acm-table acm-ia-table">
+                <thead>
+                  <tr>
+                    <th></th><th>Dirección / Zona</th><th>Precio (S/)</th><th>Área techada</th><th>Área ocupada</th>
+                    <th>Área equiv.</th><th>S//m² equiv.</th><th>Dorm.</th><th>Baños</th><th>Antigüedad</th>
+                    <th>Piso</th><th>Ascensor</th><th>Estac.</th><th>Cercanía</th><th>Similitud</th><th>Fuente</th>
+                  </tr>
+                </thead>
+                <tbody id="acmIaRows"></tbody>
+              </table>
+            </div>
+            <div class="acm-ia-ajustes">
+              <label>% de área sin techar que cuenta como área equivalente:
+                <input type="text" id="acmIaCoefSinTechar" value="50" oninput="renderAcmIaTabla()" /> %
+              </label>
+              <label>Descuento de negociación esperado (publicado → cierre):
+                <input type="text" id="acmIaDescuentoNegociacion" value="6" oninput="renderAcmIaTabla()" /> %
+              </label>
+            </div>
+            <button class="btn-small" id="btnCalcularValorComercial" onclick="calcularValorComercialIA()">📊 Calcular valor comercial</button>
+            <button class="btn-small" onclick="agregarSeleccionadosATablaAcm()">+ Agregar seleccionados a mi tabla de arriba</button>
+            <div class="acm-ia-resultado" id="acmIaResultado"></div>
+          </div>
         </div>
 
         <div class="photos-title hide-print" id="photosTitle">Fotos del inmueble</div>
@@ -1254,9 +1318,10 @@
       // ACM con IA: le pasamos la dirección/zona/metraje a una Edge Function
       // (nunca a Supabase directo) porque esa función es la que guarda la
       // llave de la API de Claude de forma segura y hace la búsqueda web.
-      // La función SIEMPRE responde 200 con { comparables, nota } o con
-      // { error }, así el frontend solo revisa "resultado.error" y no tiene
-      // que distinguir errores de red de errores de negocio.
+      // La función SIEMPRE responde 200 con { candidatos, nota } (lista
+      // CRUDA, sin seleccionar ni calcular nada todavía) o con { error },
+      // así el frontend solo revisa "resultado.error" y no tiene que
+      // distinguir errores de red de errores de negocio.
       async buscarComparablesACM(payload) {
         const { data, error } = await sb.functions.invoke('acm-search', { body: payload });
         if (error) throw error;
@@ -1554,17 +1619,19 @@
         });
       },
       // En modo demo no hay Edge Function ni llave de Claude real: simulamos
-      // la espera de red y devolvemos comparables de EJEMPLO, marcados como
-      // tales, para poder probar todo el flujo del botón sin gastar nada ni
-      // necesitar credenciales.
+      // la espera de red y devolvemos candidatos de EJEMPLO, marcados como
+      // tales, para poder probar todo el flujo (tabla con checkboxes, cálculo
+      // del valor comercial, etc.) sin gastar nada ni necesitar credenciales.
       async buscarComparablesACM(payload) {
         await new Promise(resolve => setTimeout(resolve, 600));
         return {
-          comparables: [
-            { direccion: '(Demo) Calle Los Pinos 345, cerca de ' + (payload.distrito || 'la zona indicada'), m2: 95, precio: 380000, fuente: 'https://ejemplo-demo.pe/aviso-1' },
-            { direccion: '(Demo) Av. Las Flores 120, mismo distrito', m2: 88, precio: 350000, fuente: 'https://ejemplo-demo.pe/aviso-2' },
+          candidatos: [
+            { direccion: '(Demo) Mismo edificio, dpto. 601', fuente: 'Urbania', link: 'https://ejemplo-demo.pe/aviso-1', precio: 395000, area_techada: 92, area_ocupada: 92, dormitorios: 3, banos: 2, antiguedad: '8 años', piso: '6to piso', ascensor: 'Sí', estacionamientos: 1, estado_conservacion: 'Bueno', ubicacion_relativa: 'Mismo edificio', similitud: 'alto' },
+            { direccion: '(Demo) Calle Los Pinos 345, misma calle', fuente: 'Adondevivir', link: 'https://ejemplo-demo.pe/aviso-2', precio: 380000, area_techada: 95, area_ocupada: 110, dormitorios: 3, banos: 2, antiguedad: '10 años', piso: '3er piso', ascensor: 'No', estacionamientos: 1, estado_conservacion: 'No informado', ubicacion_relativa: 'Misma calle', similitud: 'alto' },
+            { direccion: '(Demo) Av. Las Flores 120, mismo distrito', fuente: 'Properati', link: 'https://ejemplo-demo.pe/aviso-3', precio: 350000, area_techada: 88, area_ocupada: 88, dormitorios: 2, banos: 2, antiguedad: 'No informado', piso: 'No informado', ascensor: 'No informado', estacionamientos: null, estado_conservacion: 'No informado', ubicacion_relativa: 'Aprox. 700 m', similitud: 'medio' },
+            { direccion: '(Demo) Residencial El Bosque, mismo distrito', fuente: 'Urbania', link: 'https://ejemplo-demo.pe/aviso-4', precio: 520000, area_techada: 140, area_ocupada: 140, dormitorios: 4, banos: 3, antiguedad: '2 años', piso: '10mo piso', ascensor: 'Sí', estacionamientos: 2, estado_conservacion: 'A estrenar', ubicacion_relativa: 'Aprox. 950 m', similitud: 'bajo' },
           ],
-          nota: 'Resultado de EJEMPLO (modo demo) — con Supabase conectado y la llave de Anthropic configurada, aquí aparecerán comparables reales encontrados en la web.',
+          nota: 'Resultado de EJEMPLO (modo demo) — con Supabase conectado y la llave de Anthropic configurada, aquí aparecerán candidatos reales encontrados en la web, siempre en soles.',
         };
       },
       async listOportunidades() {
@@ -4957,12 +5024,13 @@
    * como se trabaja hoy: primero el ACM, luego la Ficha de Rentabilidad.
    * ==================================================================== */
 
-  // Busca comparables automáticamente con IA (ver Edge Function "acm-search").
+  // Busca candidatos automáticamente con IA (ver Edge Function "acm-search").
   // No se dispara solo ni se repite: cada clic es una decisión consciente del
   // usuario, porque cada búsqueda real tiene un costo de uso en la API de
-  // Anthropic (separado de la suscripción a Claude). Los resultados SIEMPRE
-  // se agregan como filas normales del ACM — con su fuente/link visible — así
-  // el usuario revisa cada comparable igual que si lo hubiera tipeado a mano.
+  // Anthropic (separado de la suscripción a Claude). La IA solo devuelve una
+  // lista CRUDA de candidatos — la selección de cuáles usar y todo el
+  // cálculo (área equivalente, % de negociación, ponderación, etc.) se hace
+  // después, en el navegador, sin volver a llamar a la IA.
   async function buscarComparablesIA() {
     const inmueble = {
       direccion: document.getElementById('direccion').value.trim(),
@@ -4987,19 +5055,254 @@
         showToast('No se pudo completar la búsqueda: ' + resultado.error);
         return;
       }
-      const comparables = (resultado && resultado.comparables) || [];
-      if (!comparables.length) {
-        showToast((resultado && resultado.nota) || 'La IA no encontró comparables confiables para esta dirección.');
+      const candidatos = (resultado && resultado.candidatos) || [];
+      acmIaNotaTexto = (resultado && resultado.nota) || '';
+      if (!candidatos.length) {
+        showToast(acmIaNotaTexto || 'La IA no encontró candidatos confiables para esta dirección.');
+        acmIaCandidatos = [];
+        document.getElementById('acmIaPanel').style.display = 'none';
         return;
       }
-      comparables.forEach(c => addAcmRow(c));
-      if (resultado.nota) showToast(resultado.nota);
+      // Preselección sugerida por la IA: similitud alta o media empieza
+      // marcada, similitud baja empieza sin marcar — el usuario puede
+      // cambiar cualquier casilla libremente antes de calcular.
+      acmIaCandidatos = candidatos.map(c => ({ ...c, _selected: c.similitud !== 'bajo' }));
+      document.getElementById('acmIaResultado').innerHTML = '';
+      document.getElementById('acmIaPanel').style.display = '';
+      renderAcmIaTabla();
+      programarAutoguardadoFicha();
     } catch (e) {
       showToast('No se pudo completar la búsqueda: ' + (e && e.message ? e.message : e));
     } finally {
       btn.disabled = false;
       btn.textContent = originalLabel;
     }
+  }
+
+  /* ===== ACM con IA: candidatos crudos → selección manual → cálculo =====
+     acmIaCandidatos guarda la última búsqueda (o lo restaurado al abrir una
+     ficha guardada). El área equivalente, el S//m² equivalente y si un
+     candidato es atípico se recalculan al vuelo cada vez que se dibuja la
+     tabla — nunca se guardan ya calculados, así cambiar el % de área sin
+     techar o el % de negociación recalcula todo al instante, sin repetir
+     la búsqueda (que es la única parte con costo). */
+  let acmIaCandidatos = [];
+  let acmIaNotaTexto = '';
+  const ACM_IA_PESO_SIMILITUD = { alto: 1, medio: 0.6, bajo: 0.3 };
+  const ACM_IA_ORDEN_CERCANIA = ['mismo edificio', 'mismo condominio', 'misma calle', 'misma urbanización'];
+
+  function acmIaAreaEquivalente(c, coefPct) {
+    const techada = c.area_techada;
+    const ocupada = c.area_ocupada;
+    if (techada == null && ocupada == null) return null;
+    if (techada == null) return ocupada;
+    const sinTechar = ocupada != null ? Math.max(0, ocupada - techada) : 0;
+    return techada + sinTechar * (coefPct / 100);
+  }
+
+  function acmIaRankCercania(texto) {
+    const t = (texto || '').toLowerCase();
+    for (let i = 0; i < ACM_IA_ORDEN_CERCANIA.length; i++) {
+      if (t.includes(ACM_IA_ORDEN_CERCANIA[i])) return i;
+    }
+    const metros = t.match(/(\d+)\s*m/);
+    if (metros) return 10 + Number(metros[1]) / 1000;
+    return 99;
+  }
+
+  function renderAcmIaTabla() {
+    const tbody = document.getElementById('acmIaRows');
+    if (!tbody) return;
+    const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
+
+    const calculados = acmIaCandidatos.map((c, idx) => {
+      const areaEquiv = acmIaAreaEquivalente(c, coefPct);
+      const pm2Equiv = (areaEquiv > 0 && c.precio > 0) ? c.precio / areaEquiv : null;
+      return { ...c, _idx: idx, _areaEquiv: areaEquiv, _pm2Equiv: pm2Equiv };
+    });
+
+    // Atípicos: candidatos cuyo S//m² equivalente se aleja más de 40% de la
+    // mediana del grupo con dato — solo una señal visual para revisar antes
+    // de confiar en el resultado, no se excluyen solos del cálculo.
+    const pm2Validos = calculados.filter(c => c._pm2Equiv != null).map(c => c._pm2Equiv).sort((a, b) => a - b);
+    let medianaPm2 = null;
+    if (pm2Validos.length) {
+      const mid = Math.floor(pm2Validos.length / 2);
+      medianaPm2 = pm2Validos.length % 2 !== 0 ? pm2Validos[mid] : (pm2Validos[mid - 1] + pm2Validos[mid]) / 2;
+    }
+    calculados.forEach(c => {
+      c._outlier = !!(medianaPm2 && c._pm2Equiv != null && (c._pm2Equiv > medianaPm2 * 1.4 || c._pm2Equiv < medianaPm2 * 0.6));
+    });
+
+    const orden = document.getElementById('acmIaOrden').value;
+    const ordenados = [...calculados].sort((a, b) => {
+      if (orden === 'precio') return (a.precio ?? Infinity) - (b.precio ?? Infinity);
+      if (orden === 'pm2') return (a._pm2Equiv ?? Infinity) - (b._pm2Equiv ?? Infinity);
+      if (orden === 'ubicacion') return acmIaRankCercania(a.ubicacion_relativa) - acmIaRankCercania(b.ubicacion_relativa);
+      return (ACM_IA_PESO_SIMILITUD[b.similitud] || 0) - (ACM_IA_PESO_SIMILITUD[a.similitud] || 0);
+    });
+
+    tbody.innerHTML = ordenados.map(c => {
+      const outlierFlag = c._outlier ? '<span class="acm-ia-outlier-flag" title="S//m² equivalente muy distinto al resto">⚠</span>' : '';
+      const fuenteTxt = (c.fuente || 'Ver aviso').replace(/</g, '');
+      const linkHtml = c.link ? '<a href="' + c.link.replace(/"/g, '') + '" target="_blank" rel="noopener">' + fuenteTxt + '</a>' : (c.fuente || '—');
+      return (
+        '<tr class="acm-ia-row' + (c._outlier ? ' is-outlier' : '') + (c._selected ? '' : ' is-unselected') + '">' +
+        '<td class="acm-ia-check"><input type="checkbox" ' + (c._selected ? 'checked' : '') + ' onchange="acmIaToggleRow(' + c._idx + ', this.checked)" /></td>' +
+        '<td>' + (c.direccion || '—') + '</td>' +
+        '<td>' + (c.precio != null ? fmt(c.precio) : 'No informado') + '</td>' +
+        '<td>' + (c.area_techada != null ? c.area_techada + ' m²' : 'No informado') + '</td>' +
+        '<td>' + (c.area_ocupada != null ? c.area_ocupada + ' m²' : 'No informado') + '</td>' +
+        '<td>' + (c._areaEquiv != null ? c._areaEquiv.toFixed(1) + ' m²' : '—') + '</td>' +
+        '<td>' + (c._pm2Equiv != null ? fmt(c._pm2Equiv) : '—') + outlierFlag + '</td>' +
+        '<td>' + (c.dormitorios ?? 'No informado') + '</td>' +
+        '<td>' + (c.banos ?? 'No informado') + '</td>' +
+        '<td>' + (c.antiguedad || 'No informado') + '</td>' +
+        '<td>' + (c.piso || 'No informado') + '</td>' +
+        '<td>' + (c.ascensor || 'No informado') + '</td>' +
+        '<td>' + (c.estacionamientos ?? 'No informado') + '</td>' +
+        '<td>' + (c.ubicacion_relativa || 'No informado') + '</td>' +
+        '<td><span class="acm-ia-badge ' + (c.similitud || 'medio') + '">' + (c.similitud || 'medio') + '</span></td>' +
+        '<td>' + linkHtml + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    document.getElementById('acmIaNota').textContent = acmIaNotaTexto || '';
+    acmIaUpdateCount();
+  }
+
+  function acmIaUpdateCount() {
+    const countEl = document.getElementById('acmIaCount');
+    if (!countEl) return;
+    const seleccionados = acmIaCandidatos.filter(c => c._selected).length;
+    countEl.textContent = seleccionados + ' de ' + acmIaCandidatos.length + ' seleccionados';
+  }
+
+  function acmIaToggleRow(idx, checked) {
+    if (acmIaCandidatos[idx]) acmIaCandidatos[idx]._selected = checked;
+    renderAcmIaTabla();
+    programarAutoguardadoFicha();
+  }
+
+  function acmIaSeleccionarTodas(flag) {
+    acmIaCandidatos.forEach(c => { c._selected = flag; });
+    renderAcmIaTabla();
+    programarAutoguardadoFicha();
+  }
+
+  // Calcula el valor comercial a partir de los candidatos SELECCIONADOS
+  // (sección 7-11 del criterio del usuario): área equivalente, S//m²
+  // ponderado por similitud, % de negociación esperado, nivel de confianza
+  // y una advertencia si hay pocos comparables o alguno atípico entre los
+  // elegidos. Nunca vuelve a llamar a la IA — todo esto es instantáneo.
+  function calcularValorComercialIA() {
+    const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
+    const descuentoPct = parseNum(document.getElementById('acmIaDescuentoNegociacion').value) || 0;
+    const resultadoEl = document.getElementById('acmIaResultado');
+
+    const seleccionados = acmIaCandidatos
+      .filter(c => c._selected)
+      .map(c => {
+        const areaEquiv = acmIaAreaEquivalente(c, coefPct);
+        const pm2Equiv = (areaEquiv > 0 && c.precio > 0) ? c.precio / areaEquiv : null;
+        return { ...c, _areaEquiv: areaEquiv, _pm2Equiv: pm2Equiv };
+      })
+      .filter(c => c._pm2Equiv != null);
+
+    if (!seleccionados.length) {
+      resultadoEl.innerHTML = '<div class="acm-warning">Selecciona al menos un candidato con precio y área para poder calcular.</div>';
+      return;
+    }
+    const metrajeInmueble = parseNum(document.getElementById('metraje').value);
+    if (!(metrajeInmueble > 0)) {
+      resultadoEl.innerHTML = '<div class="acm-warning">Completa el metraje del inmueble (arriba) para calcular su valor comercial.</div>';
+      return;
+    }
+
+    // Promedio ponderado del S//m² equivalente: cada candidato pesa según
+    // su similitud (alto/medio/bajo), así uno "alto" influye más que uno
+    // "bajo" sin descartarlo del todo.
+    let sumaPonderada = 0, sumaPesos = 0;
+    seleccionados.forEach(c => {
+      const peso = ACM_IA_PESO_SIMILITUD[c.similitud] || 0.5;
+      sumaPonderada += c._pm2Equiv * peso;
+      sumaPesos += peso;
+    });
+    const pm2Ponderado = sumaPonderada / sumaPesos;
+
+    const pm2Valores = seleccionados.map(c => c._pm2Equiv);
+    const pm2Min = Math.min(...pm2Valores), pm2Max = Math.max(...pm2Valores);
+    const promedioSimple = pm2Valores.reduce((a, b) => a + b, 0) / pm2Valores.length;
+    const desviacion = Math.sqrt(pm2Valores.reduce((a, b) => a + Math.pow(b - promedioSimple, 2), 0) / pm2Valores.length);
+    const coefVariacion = promedioSimple > 0 ? desviacion / promedioSimple : 1;
+
+    const valorComercial = pm2Ponderado * metrajeInmueble;
+    const valorCierreEstimado = valorComercial * (1 - descuentoPct / 100);
+    const valorVentaRapida = valorCierreEstimado * 0.95;
+
+    let confianza = 'bajo';
+    if (seleccionados.length >= 6 && coefVariacion < 0.15) confianza = 'alto';
+    else if (seleccionados.length >= 3 && coefVariacion < 0.30) confianza = 'medio';
+
+    const pm2Ordenados = [...pm2Valores].sort((a, b) => a - b);
+    const midSel = Math.floor(pm2Ordenados.length / 2);
+    const medianaSel = pm2Ordenados.length % 2 !== 0 ? pm2Ordenados[midSel] : (pm2Ordenados[midSel - 1] + pm2Ordenados[midSel]) / 2;
+    const hayAtipicosEntreSeleccionados = seleccionados.some(c => c._pm2Equiv > medianaSel * 1.4 || c._pm2Equiv < medianaSel * 0.6);
+
+    const advertenciaPocos = seleccionados.length < 3
+      ? '<div class="acm-warning">⚠ Con menos de 3 comparables seleccionados, este valor es menos confiable.</div>' : '';
+    const advertenciaAtipicos = hayAtipicosEntreSeleccionados
+      ? '<div class="acm-warning">⚠ Hay comparables seleccionados con un S//m² muy distinto al resto — revísalos antes de confiar en este resultado.</div>' : '';
+
+    resultadoEl.innerHTML =
+      advertenciaPocos + advertenciaAtipicos +
+      '<div class="acm-ia-valor-box">' +
+        '<div>S//m² equivalente ponderado: <b>' + fmt(pm2Ponderado) + '</b> (rango ' + fmt(pm2Min) + ' – ' + fmt(pm2Max) + ', de ' + seleccionados.length + ' comparable(s) seleccionado(s))' +
+        '<span class="acm-ia-confianza ' + confianza + '">Confianza: ' + confianza + '</span></div>' +
+        '<div style="margin-top:6px;">Valor comercial estimado (' + metrajeInmueble + ' m² × S//m² ponderado): <b class="price">' + fmt(valorComercial) + '</b></div>' +
+        '<div>Precio de cierre estimado (−' + descuentoPct + '% de negociación): <b class="price">' + fmt(valorCierreEstimado) + '</b></div>' +
+        '<div>Venta rápida estimada (−5% adicional, orientativo): <b class="price">' + fmt(valorVentaRapida) + '</b></div>' +
+        '<div style="margin-top:8px;"><button class="btn-small" onclick="usarValorComercialAcmIA(' + valorCierreEstimado + ',' + seleccionados.length + ')">Usar precio de cierre estimado →</button></div>' +
+      '</div>';
+    programarAutoguardadoFicha();
+  }
+
+  function usarValorComercialAcmIA(valor, cantidad) {
+    document.getElementById('precioVenta').value = formatAmt(valor);
+    updateAll();
+    const note = document.getElementById('row-acmSourceNote');
+    const noteText = document.getElementById('acmSourceNoteText');
+    if (note && noteText) {
+      const today = new Date().toLocaleDateString('es-PE');
+      noteText.textContent = 'Precio tomado del ACM con IA el ' + today + ' (valor comercial ponderado de ' + cantidad + ' comparable(s) seleccionado(s)).';
+      note.style.display = '';
+    }
+    showToast('Precio de venta actualizado desde el ACM con IA ✓');
+  }
+
+  // Lleva los candidatos marcados a la tabla manual de arriba (reusa
+  // addAcmRow/updateAcm tal cual) — así quien prefiera el resumen simple
+  // (promedio/mediana/mín/máx) de la tabla de siempre también puede usarlo
+  // con los candidatos que la IA encontró, sin que un sistema reemplace al
+  // otro.
+  function agregarSeleccionadosATablaAcm() {
+    const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
+    const seleccionados = acmIaCandidatos.filter(c => c._selected);
+    if (!seleccionados.length) {
+      showToast('No hay candidatos seleccionados para agregar.');
+      return;
+    }
+    seleccionados.forEach(c => {
+      const areaEquiv = acmIaAreaEquivalente(c, coefPct);
+      addAcmRow({
+        direccion: c.direccion,
+        m2: areaEquiv != null ? Math.round(areaEquiv * 10) / 10 : (c.area_techada ?? ''),
+        precio: c.precio,
+        fuente: c.link || c.fuente,
+      });
+    });
+    showToast(seleccionados.length + ' candidato(s) agregado(s) a la tabla de comparables de arriba.');
   }
 
   function addAcmRow(data) {
@@ -5161,6 +5464,13 @@
     document.getElementById('acmRows').innerHTML = '';
     updateAcm();
     document.getElementById('row-acmSourceNote').style.display = 'none';
+    acmIaCandidatos = [];
+    acmIaNotaTexto = '';
+    document.getElementById('acmIaPanel').style.display = 'none';
+    document.getElementById('acmIaRows').innerHTML = '';
+    document.getElementById('acmIaResultado').innerHTML = '';
+    document.getElementById('acmIaCoefSinTechar').value = '50';
+    document.getElementById('acmIaDescuentoNegociacion').value = '6';
     seedDefaults();
     addPhotoCard(); addPhotoCard(); addPhotoCard();
   }
@@ -5207,6 +5517,25 @@
     document.getElementById('acmRows').innerHTML = '';
     (record.acm_comparables || []).forEach(c => addAcmRow(c));
     updateAcm();
+
+    // Candidatos de la última búsqueda con IA (y la selección que el
+    // usuario había marcado) — se restauran y se vuelven a dibujar, pero
+    // SIN volver a llamar a la IA: el cálculo es instantáneo y gratis.
+    const acmIa = record.acm_ia_candidatos;
+    document.getElementById('acmIaResultado').innerHTML = '';
+    if (acmIa && Array.isArray(acmIa.candidatos) && acmIa.candidatos.length) {
+      acmIaCandidatos = acmIa.candidatos;
+      acmIaNotaTexto = acmIa.nota || '';
+      document.getElementById('acmIaCoefSinTechar').value = !isEmpty(acmIa.coef_sin_techar) ? acmIa.coef_sin_techar : 50;
+      document.getElementById('acmIaDescuentoNegociacion').value = !isEmpty(acmIa.descuento_negociacion) ? acmIa.descuento_negociacion : 6;
+      document.getElementById('acmIaPanel').style.display = '';
+      renderAcmIaTabla();
+    } else {
+      acmIaCandidatos = [];
+      acmIaNotaTexto = '';
+      document.getElementById('acmIaPanel').style.display = 'none';
+      document.getElementById('acmIaRows').innerHTML = '';
+    }
 
     updateAll();
   }
@@ -5323,7 +5652,8 @@
       (record.gastos_post_items || []).length ||
       (record.photos || []).length ||
       (record.documentos || []).length ||
-      (record.acm_comparables || []).length
+      (record.acm_comparables || []).length ||
+      (record.acm_ia_candidatos && (record.acm_ia_candidatos.candidatos || []).length)
     );
   }
 
@@ -5379,7 +5709,18 @@
       gbancarios_qty: parseNum(document.getElementById('gbancariosQty').value) || null,
       photos: collectPhotos(),
       documentos: collectDocumentos(),
-      acm_comparables: collectAcmRows()
+      acm_comparables: collectAcmRows(),
+      // Candidatos de la última búsqueda con IA + la selección manual del
+      // usuario + sus ajustes (% área sin techar, % negociación) — así al
+      // reabrir la ficha se ve exactamente lo mismo, sin repetir la
+      // búsqueda. Si nunca se buscó (o se limpió el formulario), se guarda
+      // null en vez de un arreglo vacío.
+      acm_ia_candidatos: acmIaCandidatos.length ? {
+        candidatos: acmIaCandidatos,
+        nota: acmIaNotaTexto,
+        coef_sin_techar: parseNum(document.getElementById('acmIaCoefSinTechar').value) || 50,
+        descuento_negociacion: parseNum(document.getElementById('acmIaDescuentoNegociacion').value) || 6,
+      } : null
     };
     if (!manual && esNueva && !fichaRecordTieneContenido(record)) return;
     fichaGuardando = true;
