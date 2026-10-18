@@ -92,6 +92,16 @@
     border: 1.5px dashed #C9A227; background: #FBF6E8; color: #7A5A12; font-weight: bold; font-size: 12.5px;
   }
 
+  .ficha-estado-filtros { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .ficha-estado-chip {
+    border: 1px solid #D6DCE4; border-radius: 20px; padding: 5px 13px; font-size: 11px; font-weight: bold;
+    font-family: Arial, sans-serif; cursor: pointer; background: #fff; color: #5A6B80;
+  }
+  .ficha-estado-chip.active { border-color: transparent; }
+  .ficha-estado-chip.active.ok { background: #E1F0E5; color: #1E7A3D; }
+  .ficha-estado-chip.active.warn { background: #FCEFD8; color: #8A5A12; }
+  .ficha-estado-chip.active.muted { background: #EEF1F4; color: #33465e; }
+  .ficha-row .estado-pill { margin-right: 4px; }
   .fichas-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
   .fichas-toolbar input[type="text"] {
     flex: 1; font-family: Arial, sans-serif; font-size: 12.5px; padding: 9px 12px;
@@ -304,6 +314,8 @@
   .header-right { text-align: right; }
   .header-right .study { font-size: 11px; letter-spacing: 3px; color: #7A5A12; font-family: Arial, sans-serif; text-transform: uppercase; }
   .idbadge-wrap { margin-top: 4px; }
+  .ficha-estado-wrap { margin-top: 6px; }
+  .ficha-estado-wrap select { width: 150px; max-width: 100%; }
   .idbadge-wrap input { background: #C9A227; color: #0A2545; font-weight: bold; font-size: 13px; padding: 4px 14px; border-radius: 20px; font-family: Arial, sans-serif; border: none; text-align: center; width: 150px; min-width: 90px; max-width: 100%; box-sizing: border-box; }
 
   .genbar { margin-top: 8px; background: #14304F; border-radius: 6px; display: flex; color: #fff; font-family: Arial, sans-serif; font-size: 10.5px; overflow: hidden; }
@@ -728,6 +740,7 @@
     </div>
 
     <div class="section-title">Fichas guardadas</div>
+    <div class="ficha-estado-filtros" id="fichaEstadoFiltros"></div>
     <div class="fichas-toolbar">
       <input type="text" id="searchBox" placeholder="Buscar por triangulación, dirección o distrito..." oninput="renderFichaList()" />
       <button class="btn btn-gold" onclick="newFicha()">+ Nueva ficha</button>
@@ -748,6 +761,13 @@
             <div class="study">Estudio de Rentabilidad</div>
             <div class="idbadge-wrap">
               <input type="text" id="triangId" value="T-0001" oninput="updateAll()" />
+            </div>
+            <div class="ficha-estado-wrap no-print">
+              <select id="fichaEstado" class="cf-estado-select" onchange="onFichaEstadoChange()">
+                <option value="Analizando">Analizando</option>
+                <option value="Descartado">Descartado</option>
+                <option value="Comprado">Comprado</option>
+              </select>
             </div>
           </div>
         </div>
@@ -4321,6 +4341,37 @@
    * DASHBOARD — listado de fichas guardadas
    * ==================================================================== */
   let fichaCache = [];
+  let fichaEstadoFiltro = 'Todas';
+
+  // Chips de filtro por estado (Todas / Analizando / Descartado / Comprado),
+  // con el conteo de cada uno — se recalculan cada vez que se redibuja la
+  // lista, a partir de lo que ya hay en fichaCache (sin pedir nada extra al
+  // servidor).
+  function renderFichaEstadoFiltros() {
+    const el = document.getElementById('fichaEstadoFiltros');
+    if (!el) return;
+    const counts = { Todas: fichaCache.length, Analizando: 0, Descartado: 0, Comprado: 0 };
+    fichaCache.forEach(f => {
+      const e = (f.estado && counts[f.estado] != null) ? f.estado : 'Analizando';
+      counts[e]++;
+    });
+    const opciones = [
+      { key: 'Todas', label: 'Todas', cls: '' },
+      { key: 'Analizando', label: 'Analizando', cls: 'warn' },
+      { key: 'Descartado', label: 'Descartado', cls: 'muted' },
+      { key: 'Comprado', label: 'Comprado', cls: 'ok' },
+    ];
+    el.innerHTML = opciones.map(o =>
+      '<button type="button" class="ficha-estado-chip' + (fichaEstadoFiltro === o.key ? ' active ' + o.cls : '') + '" onclick="fichaFiltrarPorEstado(\'' + o.key + '\')">' +
+        escapeHtml(o.label) + ' (' + counts[o.key] + ')' +
+      '</button>'
+    ).join('');
+  }
+
+  function fichaFiltrarPorEstado(estado) {
+    fichaEstadoFiltro = estado;
+    renderFichaListFromCache();
+  }
 
   async function renderFichaList() {
     const listEl = document.getElementById('fichaList');
@@ -4339,22 +4390,27 @@
   // volver a pedirlo a la base — se usa después de arrastrar una fila para
   // que el nuevo orden se vea al instante, sin esperar la vuelta del server.
   function renderFichaListFromCache() {
+    renderFichaEstadoFiltros();
     const listEl = document.getElementById('fichaList');
     const q = (document.getElementById('searchBox').value || '').toLowerCase().trim();
     const filtered = fichaCache.filter(f => {
+      if (fichaEstadoFiltro !== 'Todas' && (f.estado || 'Analizando') !== fichaEstadoFiltro) return false;
       if (!q) return true;
       return [f.triang_id, f.direccion, f.distrito, f.tipo_inmueble].filter(Boolean).join(' ').toLowerCase().includes(q);
     });
     if (filtered.length === 0) {
-      listEl.innerHTML = '<div class="empty-state">Todavía no hay fichas guardadas. Crea la primera con "+ Nueva ficha".</div>';
+      listEl.innerHTML = fichaCache.length
+        ? '<div class="empty-state">No hay fichas que coincidan con este filtro.</div>'
+        : '<div class="empty-state">Todavía no hay fichas guardadas. Crea la primera con "+ Nueva ficha".</div>';
       return;
     }
     listEl.innerHTML = '';
-    // Mientras se está buscando, las posiciones visibles no reflejan el orden
-    // real de la lista completa — arrastrar en ese momento reordenaría cosas
-    // que ni siquiera se ven, así que se desactiva el arrastre (igual que ya
-    // hace la lista de Proyectos en Control Financiero).
-    const filtrando = q.length > 0;
+    // Mientras se está buscando o filtrando por estado, las posiciones
+    // visibles no reflejan el orden real de la lista completa — arrastrar en
+    // ese momento reordenaría cosas que ni siquiera se ven, así que se
+    // desactiva el arrastre (igual que ya hace la lista de Proyectos en
+    // Control Financiero).
+    const filtrando = q.length > 0 || fichaEstadoFiltro !== 'Todas';
     filtered.forEach(f => {
       const compraSum = sumItems(f.compra_items);
       const alcabalaBase = compraSum > 0 ? Math.max(0, compraSum - parseNum(!isEmpty(f.alcabala_exonerado) ? f.alcabala_exonerado : ALCABALA_EXONERADO_FALLBACK)) : 0;
@@ -4380,7 +4436,10 @@
         '<div class="id-badge">' + escapeHtml(f.triang_id || '—') + '</div>' +
         '<div class="info">' +
           '<div class="addr">' + escapeHtml(f.direccion || f.tipo_inmueble || 'Sin dirección') + '</div>' +
-          '<div class="meta">' + escapeHtml(f.distrito || '') + (f.updated_at ? ' · actualizado ' + new Date(f.updated_at).toLocaleDateString('es-PE') : '') + '</div>' +
+          '<div class="meta">' +
+            '<span class="cf-pill estado-pill ' + fichaEstadoClase(f.estado || 'Analizando') + '">' + escapeHtml(f.estado || 'Analizando') + '</span>' +
+            escapeHtml(f.distrito || '') + (f.updated_at ? ' · actualizado ' + new Date(f.updated_at).toLocaleDateString('es-PE') : '') +
+          '</div>' +
         '</div>' +
         '<div class="utilidad">' + (utilidad === null ? '' : fmt(utilidad)) + '</div>' +
         '<button class="del-btn" onclick="deleteFichaConfirm(\'' + f.id + '\', ' + JSON.stringify(f.triang_id || '').replace(/"/g,'&quot;') + ')">×</button>';
@@ -5050,6 +5109,19 @@
     showToast('Precio de venta actualizado desde el ACM ✓');
   }
 
+  // Estado de la Ficha: para distinguir, de un vistazo, los inmuebles que
+  // solo se están evaluando de los que ya se llegaron a comprar (o se
+  // descartaron). Es un campo manual, independiente de si la ficha además
+  // se vincula o no a un Proyecto en Control Financiero — esos son sistemas
+  // distintos con propósitos distintos.
+  function fichaEstadoClase(estado) {
+    return estado === 'Comprado' ? 'ok' : estado === 'Descartado' ? 'muted' : 'warn';
+  }
+  function onFichaEstadoChange() {
+    const sel = document.getElementById('fichaEstado');
+    sel.className = 'cf-estado-select ' + fichaEstadoClase(sel.value);
+  }
+
   /* ===== Reset / poblar formulario ===== */
   // El monto exonerado de Alcabala (10 UIT) cambia una vez al año — se
   // recuerda el último valor usado (localStorage) para que no haya que
@@ -5077,6 +5149,8 @@
     });
     document.getElementById('incluyeEstacionamiento').checked = false;
     document.getElementById('triangId').value = '';
+    document.getElementById('fichaEstado').value = 'Analizando';
+    onFichaEstadoChange();
     document.getElementById('alcabalaExonerado').value = formatAmt(getAlcabalaExoneradoDefault());
     clearRows('tb-compra'); clearRows('tb-gcompra'); clearRows('tb-gpost');
     document.getElementById('photoGrid').innerHTML = '';
@@ -5093,6 +5167,11 @@
 
   function populateFicha(record) {
     document.getElementById('triangId').value = record.triang_id || '';
+    // Las fichas guardadas antes de que existiera este campo no tienen
+    // "estado" — se muestran como "Analizando" (el punto de partida lógico)
+    // en vez de quedar en blanco o romper el selector.
+    document.getElementById('fichaEstado').value = record.estado || 'Analizando';
+    onFichaEstadoChange();
     document.getElementById('tipoInmueble').value = record.tipo_inmueble || '';
     document.getElementById('distrito').value = record.distrito || '';
     document.getElementById('metraje').value = record.metraje || '';
@@ -5282,6 +5361,7 @@
       id: currentFichaId,
       module: 'rentabilidad',
       triang_id: triangIdValue,
+      estado: document.getElementById('fichaEstado').value || 'Analizando',
       tipo_inmueble: document.getElementById('tipoInmueble').value,
       distrito: document.getElementById('distrito').value,
       metraje: document.getElementById('metraje').value,
