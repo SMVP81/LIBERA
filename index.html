@@ -347,6 +347,9 @@
   .acm-suggested b.price { color: #146C43; }
   .acm-empty { font-size: 10.5px; color: #97A2B0; }
   .acm-warning { font-size: 10.5px; color: #8a5a12; background: #FBF0DA; border-radius: 5px; padding: 4px 8px; margin-top: 6px; display: inline-block; }
+  .acm-ia-hint { font-size: 9.5px; color: #97A2B0; margin: 4px 0 0; }
+  #btnBuscarAcmIA { margin-left: 6px; }
+  #btnBuscarAcmIA:disabled { opacity: 0.6; cursor: wait; }
   .docs-list-header { display: flex; gap: 8px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; color: #8a95a3; padding: 0 10px; margin-top: 8px; }
   .docs-list-header span:nth-child(1) { flex: 1; min-width: 120px; }
   .docs-list-header span:nth-child(2) { width: 170px; }
@@ -785,6 +788,8 @@
             </table>
           </div>
           <button class="btn-small" onclick="addAcmRow()">+ Agregar comparable</button>
+          <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar comparables con IA</button>
+          <div class="acm-ia-hint">Usa la dirección, distrito, tipo y metraje de arriba. Cada búsqueda tiene un costo pequeño (API de Anthropic) — revisa siempre la fuente de cada comparable antes de usarlo.</div>
           <div class="acm-summary" id="acmSummary"></div>
         </div>
 
@@ -1226,6 +1231,17 @@
         const { data } = sb.storage.from('oportunidad-documentos').getPublicUrl(path);
         return data.publicUrl;
       },
+      // ACM con IA: le pasamos la dirección/zona/metraje a una Edge Function
+      // (nunca a Supabase directo) porque esa función es la que guarda la
+      // llave de la API de Claude de forma segura y hace la búsqueda web.
+      // La función SIEMPRE responde 200 con { comparables, nota } o con
+      // { error }, así el frontend solo revisa "resultado.error" y no tiene
+      // que distinguir errores de red de errores de negocio.
+      async buscarComparablesACM(payload) {
+        const { data, error } = await sb.functions.invoke('acm-search', { body: payload });
+        if (error) throw error;
+        return data;
+      },
       async listOportunidades() {
         const { data, error } = await sb.from('oportunidades').select('*').order('updated_at', { ascending: false });
         if (error) throw error;
@@ -1516,6 +1532,20 @@
           reader.onload = e => resolve(e.target.result);
           reader.readAsDataURL(file);
         });
+      },
+      // En modo demo no hay Edge Function ni llave de Claude real: simulamos
+      // la espera de red y devolvemos comparables de EJEMPLO, marcados como
+      // tales, para poder probar todo el flujo del botón sin gastar nada ni
+      // necesitar credenciales.
+      async buscarComparablesACM(payload) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        return {
+          comparables: [
+            { direccion: '(Demo) Calle Los Pinos 345, cerca de ' + (payload.distrito || 'la zona indicada'), m2: 95, precio: 380000, fuente: 'https://ejemplo-demo.pe/aviso-1' },
+            { direccion: '(Demo) Av. Las Flores 120, mismo distrito', m2: 88, precio: 350000, fuente: 'https://ejemplo-demo.pe/aviso-2' },
+          ],
+          nota: 'Resultado de EJEMPLO (modo demo) — con Supabase conectado y la llave de Anthropic configurada, aquí aparecerán comparables reales encontrados en la web.',
+        };
       },
       async listOportunidades() {
         const all = [...memOps].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
@@ -4867,6 +4897,52 @@
    * Precio de Venta con comparables reales antes de armar la ficha, tal
    * como se trabaja hoy: primero el ACM, luego la Ficha de Rentabilidad.
    * ==================================================================== */
+
+  // Busca comparables automáticamente con IA (ver Edge Function "acm-search").
+  // No se dispara solo ni se repite: cada clic es una decisión consciente del
+  // usuario, porque cada búsqueda real tiene un costo de uso en la API de
+  // Anthropic (separado de la suscripción a Claude). Los resultados SIEMPRE
+  // se agregan como filas normales del ACM — con su fuente/link visible — así
+  // el usuario revisa cada comparable igual que si lo hubiera tipeado a mano.
+  async function buscarComparablesIA() {
+    const inmueble = {
+      direccion: document.getElementById('direccion').value.trim(),
+      distrito: document.getElementById('distrito').value.trim(),
+      tipo_inmueble: document.getElementById('tipoInmueble').value.trim(),
+      metraje: document.getElementById('metraje').value.trim(),
+    };
+    if (!inmueble.direccion) {
+      alert('Escribe primero la dirección del inmueble (arriba) para poder buscar comparables.');
+      return;
+    }
+    if (!confirm('Esto va a buscar comparables en la web usando IA. Cada búsqueda tiene un costo pequeño en la API de Anthropic (aparte de tu suscripción a Claude). ¿Continuar?')) {
+      return;
+    }
+    const btn = document.getElementById('btnBuscarAcmIA');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Buscando…';
+    try {
+      const resultado = await db.buscarComparablesACM(inmueble);
+      if (resultado && resultado.error) {
+        showToast('No se pudo completar la búsqueda: ' + resultado.error);
+        return;
+      }
+      const comparables = (resultado && resultado.comparables) || [];
+      if (!comparables.length) {
+        showToast((resultado && resultado.nota) || 'La IA no encontró comparables confiables para esta dirección.');
+        return;
+      }
+      comparables.forEach(c => addAcmRow(c));
+      if (resultado.nota) showToast(resultado.nota);
+    } catch (e) {
+      showToast('No se pudo completar la búsqueda: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
   function addAcmRow(data) {
     const tbody = document.getElementById('acmRows');
     const tr = document.createElement('tr');
