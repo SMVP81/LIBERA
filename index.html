@@ -360,6 +360,11 @@
   .acm-empty { font-size: 10.5px; color: #97A2B0; }
   .acm-warning { font-size: 10.5px; color: #8a5a12; background: #FBF0DA; border-radius: 5px; padding: 4px 8px; margin-top: 6px; display: inline-block; }
   .acm-ia-hint { font-size: 9.5px; color: #97A2B0; margin: 4px 0 0; }
+  .acm-subject-fields { margin: 10px 0 14px; padding: 10px 12px; background: #FFFFFF; border: 1px solid #E3E8EF; border-radius: 7px; }
+  .acm-subject-title { font-size: 11px; font-weight: bold; color: #33465e; margin-bottom: 2px; }
+  .acm-subject-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .acm-subject-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 9.5px; color: #5A6B80; text-transform: uppercase; letter-spacing: 0.3px; }
+  .acm-subject-grid input, .acm-subject-grid select { font-size: 11px; padding: 4px 6px; border: 1px solid #C7CFDA; border-radius: 4px; font-family: Arial, sans-serif; width: 110px; text-transform: none; letter-spacing: normal; }
   #btnBuscarAcmIA { margin-left: 6px; }
   #btnBuscarAcmIA:disabled { opacity: 0.6; cursor: wait; }
   .acm-ia-panel { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #C7CFDA; }
@@ -371,6 +376,9 @@
   table.acm-ia-table td.acm-ia-check { text-align: center; padding: 4px 2px; }
   tr.acm-ia-row.is-outlier td { background: #FDEFE6; }
   tr.acm-ia-row.is-unselected { opacity: 0.55; }
+  tr.acm-ia-row.is-sin-fuente td { background: #FBE4E4; }
+  .acm-ia-sin-fuente { color: #8a1212; font-weight: bold; font-size: 9.5px; white-space: nowrap; }
+  .acm-ia-sin-fuente-tag { color: #8a1212; }
   .acm-ia-badge { display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 9px; font-weight: bold; }
   .acm-ia-badge.alto { background: #DFF3E3; color: #146C43; }
   .acm-ia-badge.medio { background: #FBF0DA; color: #8a5a12; }
@@ -822,6 +830,27 @@
         <div class="acm-box no-print" id="acmBox">
           <div class="photos-title" style="margin-top:0;">🛠 Herramienta: ACM (Análisis Comparativo de Mercado)</div>
           <div class="acm-hint">Compara propiedades similares para sustentar el Precio de Venta de abajo. Esto no sale en el PDF impreso.</div>
+
+          <div class="acm-subject-fields">
+            <div class="acm-subject-title">Características del inmueble a evaluar (opcional)</div>
+            <div class="acm-hint">Mientras más completes, más preciso es el área equivalente y más parecidos son los candidatos que encuentra la IA (busca con los mismos dormitorios/baños/antigüedad, no solo el mismo metraje).</div>
+            <div class="acm-subject-grid">
+              <label>Área ocupada (m²)<input type="text" id="areaOcupadaInmueble" placeholder="Igual al metraje si no hay área libre" oninput="updateAcm()" /></label>
+              <label>Dormitorios<input type="text" id="dormitoriosInmueble" placeholder="3" oninput="updateAcm()" /></label>
+              <label>Baños<input type="text" id="banosInmueble" placeholder="2" oninput="updateAcm()" /></label>
+              <label>Antigüedad<input type="text" id="antiguedadInmueble" placeholder="Ej. 10 años" oninput="updateAcm()" /></label>
+              <label>Piso<input type="text" id="pisoInmueble" placeholder="Ej. 6to piso" oninput="updateAcm()" /></label>
+              <label>Ascensor
+                <select id="ascensorInmueble" onchange="updateAcm()">
+                  <option value="">No informado</option>
+                  <option value="Sí">Sí</option>
+                  <option value="No">No</option>
+                </select>
+              </label>
+              <label>Estacionamientos<input type="text" id="estacionamientosInmueble" placeholder="1" oninput="updateAcm()" /></label>
+            </div>
+          </div>
+
           <div class="acm-table-wrap">
             <table class="acm-table">
               <thead>
@@ -5037,6 +5066,16 @@
       distrito: document.getElementById('distrito').value.trim(),
       tipo_inmueble: document.getElementById('tipoInmueble').value.trim(),
       metraje: document.getElementById('metraje').value.trim(),
+      // Características opcionales — si están completas, la IA busca
+      // candidatos más parecidos (mismos dormitorios/baños/antigüedad),
+      // no solo del mismo metraje.
+      area_ocupada: document.getElementById('areaOcupadaInmueble').value.trim(),
+      dormitorios: document.getElementById('dormitoriosInmueble').value.trim(),
+      banos: document.getElementById('banosInmueble').value.trim(),
+      antiguedad: document.getElementById('antiguedadInmueble').value.trim(),
+      piso: document.getElementById('pisoInmueble').value.trim(),
+      ascensor: document.getElementById('ascensorInmueble').value.trim(),
+      estacionamientos: document.getElementById('estacionamientosInmueble').value.trim(),
     };
     if (!inmueble.direccion) {
       alert('Escribe primero la dirección del inmueble (arriba) para poder buscar comparables.');
@@ -5065,8 +5104,11 @@
       }
       // Preselección sugerida por la IA: similitud alta o media empieza
       // marcada, similitud baja empieza sin marcar — el usuario puede
-      // cambiar cualquier casilla libremente antes de calcular.
-      acmIaCandidatos = candidatos.map(c => ({ ...c, _selected: c.similitud !== 'bajo' }));
+      // cambiar cualquier casilla libremente antes de calcular. Un
+      // candidato SIN fuente/link verificable nunca empieza preseleccionado
+      // (la Edge Function ya filtra estos casos, pero esto es una segunda
+      // capa de seguridad, por si algún día cambia la fuente de datos).
+      acmIaCandidatos = candidatos.map(c => ({ ...c, _selected: c.similitud !== 'bajo' && acmIaTieneLinkReal(c) }));
       document.getElementById('acmIaResultado').innerHTML = '';
       document.getElementById('acmIaPanel').style.display = '';
       renderAcmIaTabla();
@@ -5090,6 +5132,15 @@
   let acmIaNotaTexto = '';
   const ACM_IA_PESO_SIMILITUD = { alto: 1, medio: 0.6, bajo: 0.3 };
   const ACM_IA_ORDEN_CERCANIA = ['mismo edificio', 'mismo condominio', 'misma calle', 'misma urbanización'];
+
+  // Un candidato solo se considera verificable si trae un link con forma de
+  // URL real (http/https) — sin eso no hay cómo comprobar que el dato no
+  // fue inventado. La Edge Function ya descarta estos casos del lado del
+  // servidor; esto es una segunda capa, por si queda algo guardado de
+  // antes de ese filtro o si en el futuro los datos vienen de otro lado.
+  function acmIaTieneLinkReal(c) {
+    return !!(c && typeof c.link === 'string' && /^https?:\/\/.+/i.test(c.link));
+  }
 
   function acmIaAreaEquivalente(c, coefPct) {
     const techada = c.area_techada;
@@ -5144,12 +5195,15 @@
 
     tbody.innerHTML = ordenados.map(c => {
       const outlierFlag = c._outlier ? '<span class="acm-ia-outlier-flag" title="S//m² equivalente muy distinto al resto">⚠</span>' : '';
+      const sinFuente = !acmIaTieneLinkReal(c);
       const fuenteTxt = (c.fuente || 'Ver aviso').replace(/</g, '');
-      const linkHtml = c.link ? '<a href="' + c.link.replace(/"/g, '') + '" target="_blank" rel="noopener">' + fuenteTxt + '</a>' : (c.fuente || '—');
+      const linkHtml = sinFuente
+        ? '<span class="acm-ia-sin-fuente">⚠ SIN FUENTE VERIFICABLE — no uses este dato</span>'
+        : '<a href="' + c.link.replace(/"/g, '') + '" target="_blank" rel="noopener">' + fuenteTxt + '</a>';
       return (
-        '<tr class="acm-ia-row' + (c._outlier ? ' is-outlier' : '') + (c._selected ? '' : ' is-unselected') + '">' +
+        '<tr class="acm-ia-row' + (c._outlier ? ' is-outlier' : '') + (sinFuente ? ' is-sin-fuente' : '') + (c._selected ? '' : ' is-unselected') + '">' +
         '<td class="acm-ia-check"><input type="checkbox" ' + (c._selected ? 'checked' : '') + ' onchange="acmIaToggleRow(' + c._idx + ', this.checked)" /></td>' +
-        '<td>' + (c.direccion || '—') + '</td>' +
+        '<td>' + (c.direccion || '—') + (sinFuente ? ' <span class="acm-ia-sin-fuente-tag">⚠</span>' : '') + '</td>' +
         '<td>' + (c.precio != null ? fmt(c.precio) : 'No informado') + '</td>' +
         '<td>' + (c.area_techada != null ? c.area_techada + ' m²' : 'No informado') + '</td>' +
         '<td>' + (c.area_ocupada != null ? c.area_ocupada + ' m²' : 'No informado') + '</td>' +
@@ -5186,8 +5240,19 @@
   }
 
   function acmIaSeleccionarTodas(flag) {
-    acmIaCandidatos.forEach(c => { c._selected = flag; });
+    // "Deseleccionar todas" siempre vale para todas las filas. "Seleccionar
+    // todas" nunca marca un candidato sin fuente verificable — si quedó
+    // alguno así guardado de antes de este filtro, el usuario tendría que
+    // marcarlo a mano, a sabiendas de que no se pudo comprobar.
+    let omitidos = 0;
+    acmIaCandidatos.forEach(c => {
+      if (flag && !acmIaTieneLinkReal(c)) { omitidos++; return; }
+      c._selected = flag;
+    });
     renderAcmIaTabla();
+    if (flag && omitidos > 0) {
+      showToast('No se marcaron ' + omitidos + ' candidato(s) sin fuente verificable — revísalos manualmente si quieres usarlos.');
+    }
     programarAutoguardadoFicha();
   }
 
@@ -5201,8 +5266,14 @@
     const descuentoPct = parseNum(document.getElementById('acmIaDescuentoNegociacion').value) || 0;
     const resultadoEl = document.getElementById('acmIaResultado');
 
-    const seleccionados = acmIaCandidatos
-      .filter(c => c._selected)
+    const seleccionadosConTodo = acmIaCandidatos.filter(c => c._selected);
+    // Un candidato sin fuente/link verificable NUNCA entra al cálculo,
+    // aunque esté marcado — esto es lo que falló en producción: la IA puso
+    // candidatos inventados en la lista y el usuario (razonablemente) confió
+    // en el número final. Mejor calcular con menos datos que con datos falsos.
+    const descartadosSinFuente = seleccionadosConTodo.filter(c => !acmIaTieneLinkReal(c)).length;
+    const seleccionados = seleccionadosConTodo
+      .filter(c => acmIaTieneLinkReal(c))
       .map(c => {
         const areaEquiv = acmIaAreaEquivalente(c, coefPct);
         const pm2Equiv = (areaEquiv > 0 && c.precio > 0) ? c.precio / areaEquiv : null;
@@ -5211,7 +5282,8 @@
       .filter(c => c._pm2Equiv != null);
 
     if (!seleccionados.length) {
-      resultadoEl.innerHTML = '<div class="acm-warning">Selecciona al menos un candidato con precio y área para poder calcular.</div>';
+      resultadoEl.innerHTML = '<div class="acm-warning">Selecciona al menos un candidato con precio, área y fuente verificable para poder calcular.' +
+        (descartadosSinFuente ? ' (Había ' + descartadosSinFuente + ' seleccionado(s) sin fuente verificable — no cuentan.)' : '') + '</div>';
       return;
     }
     const metrajeInmueble = parseNum(document.getElementById('metraje').value);
@@ -5219,6 +5291,13 @@
       resultadoEl.innerHTML = '<div class="acm-warning">Completa el metraje del inmueble (arriba) para calcular su valor comercial.</div>';
       return;
     }
+    // El área equivalente del inmueble a evaluar se calcula con la MISMA
+    // fórmula que a los candidatos (área techada = metraje, + el % del área
+    // sin techar que se haya indicado) — así la comparación es consistente
+    // en ambos lados. Si no se completó el área ocupada, el área equivalente
+    // es simplemente el metraje, igual que antes de este cambio.
+    const areaOcupadaInmuebleVal = parseNum(document.getElementById('areaOcupadaInmueble').value) || null;
+    const areaEquivInmueble = acmIaAreaEquivalente({ area_techada: metrajeInmueble, area_ocupada: areaOcupadaInmuebleVal }, coefPct) || metrajeInmueble;
 
     // Promedio ponderado del S//m² equivalente: cada candidato pesa según
     // su similitud (alto/medio/bajo), así uno "alto" influye más que uno
@@ -5237,7 +5316,7 @@
     const desviacion = Math.sqrt(pm2Valores.reduce((a, b) => a + Math.pow(b - promedioSimple, 2), 0) / pm2Valores.length);
     const coefVariacion = promedioSimple > 0 ? desviacion / promedioSimple : 1;
 
-    const valorComercial = pm2Ponderado * metrajeInmueble;
+    const valorComercial = pm2Ponderado * areaEquivInmueble;
     const valorCierreEstimado = valorComercial * (1 - descuentoPct / 100);
     const valorVentaRapida = valorCierreEstimado * 0.95;
 
@@ -5254,13 +5333,15 @@
       ? '<div class="acm-warning">⚠ Con menos de 3 comparables seleccionados, este valor es menos confiable.</div>' : '';
     const advertenciaAtipicos = hayAtipicosEntreSeleccionados
       ? '<div class="acm-warning">⚠ Hay comparables seleccionados con un S//m² muy distinto al resto — revísalos antes de confiar en este resultado.</div>' : '';
+    const advertenciaSinFuente = descartadosSinFuente
+      ? '<div class="acm-warning">⚠ Se excluyeron ' + descartadosSinFuente + ' candidato(s) marcado(s) por no tener una fuente verificable — no se usaron en este cálculo.</div>' : '';
 
     resultadoEl.innerHTML =
-      advertenciaPocos + advertenciaAtipicos +
+      advertenciaPocos + advertenciaAtipicos + advertenciaSinFuente +
       '<div class="acm-ia-valor-box">' +
         '<div>S//m² equivalente ponderado: <b>' + fmt(pm2Ponderado) + '</b> (rango ' + fmt(pm2Min) + ' – ' + fmt(pm2Max) + ', de ' + seleccionados.length + ' comparable(s) seleccionado(s))' +
         '<span class="acm-ia-confianza ' + confianza + '">Confianza: ' + confianza + '</span></div>' +
-        '<div style="margin-top:6px;">Valor comercial estimado (' + metrajeInmueble + ' m² × S//m² ponderado): <b class="price">' + fmt(valorComercial) + '</b></div>' +
+        '<div style="margin-top:6px;">Valor comercial estimado (' + areaEquivInmueble.toFixed(1) + ' m² equivalentes × S//m² ponderado): <b class="price">' + fmt(valorComercial) + '</b></div>' +
         '<div>Precio de cierre estimado (−' + descuentoPct + '% de negociación): <b class="price">' + fmt(valorCierreEstimado) + '</b></div>' +
         '<div>Venta rápida estimada (−5% adicional, orientativo): <b class="price">' + fmt(valorVentaRapida) + '</b></div>' +
         '<div style="margin-top:8px;"><button class="btn-small" onclick="usarValorComercialAcmIA(' + valorCierreEstimado + ',' + seleccionados.length + ')">Usar precio de cierre estimado →</button></div>' +
@@ -5288,9 +5369,15 @@
   // otro.
   function agregarSeleccionadosATablaAcm() {
     const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
-    const seleccionados = acmIaCandidatos.filter(c => c._selected);
+    const seleccionadosConTodo = acmIaCandidatos.filter(c => c._selected);
+    // Igual que en el cálculo: nunca se pasa a la tabla manual un candidato
+    // sin fuente verificable, aunque esté marcado.
+    const descartadosSinFuente = seleccionadosConTodo.filter(c => !acmIaTieneLinkReal(c)).length;
+    const seleccionados = seleccionadosConTodo.filter(c => acmIaTieneLinkReal(c));
     if (!seleccionados.length) {
-      showToast('No hay candidatos seleccionados para agregar.');
+      showToast(descartadosSinFuente
+        ? 'No se agregó nada: los candidatos seleccionados no tienen fuente verificable.'
+        : 'No hay candidatos seleccionados para agregar.');
       return;
     }
     seleccionados.forEach(c => {
@@ -5302,7 +5389,8 @@
         fuente: c.link || c.fuente,
       });
     });
-    showToast(seleccionados.length + ' candidato(s) agregado(s) a la tabla de comparables de arriba.');
+    showToast(seleccionados.length + ' candidato(s) agregado(s) a la tabla de comparables de arriba.' +
+      (descartadosSinFuente ? ' (' + descartadosSinFuente + ' no se agregaron por no tener fuente verificable.)' : ''));
   }
 
   function addAcmRow(data) {
@@ -5447,9 +5535,10 @@
     // este valor DESPUÉS de llamar a newFicha() (que pasa por aquí), así que el
     // flujo correcto de "crear ficha desde una oportunidad" no se ve afectado.
     pendingOportunidadLink = null;
-    ['tipoInmueble','distrito','metraje','direccion','linkUbicacion','precioVenta','agenteQty','impuestoQty','gbancariosQty','valorEstacionamiento'].forEach(id => {
+    ['tipoInmueble','distrito','metraje','direccion','linkUbicacion','precioVenta','agenteQty','impuestoQty','gbancariosQty','valorEstacionamiento','areaOcupadaInmueble','dormitoriosInmueble','banosInmueble','antiguedadInmueble','pisoInmueble','estacionamientosInmueble'].forEach(id => {
       document.getElementById(id).value = '';
     });
+    document.getElementById('ascensorInmueble').value = '';
     document.getElementById('incluyeEstacionamiento').checked = false;
     document.getElementById('triangId').value = '';
     document.getElementById('fichaEstado').value = 'Analizando';
@@ -5485,6 +5574,16 @@
     document.getElementById('tipoInmueble').value = record.tipo_inmueble || '';
     document.getElementById('distrito').value = record.distrito || '';
     document.getElementById('metraje').value = record.metraje || '';
+    // Características opcionales del inmueble a evaluar (para el ACM) — las
+    // fichas guardadas antes de que existiera este campo simplemente no lo
+    // traen, y quedan en blanco sin romper nada.
+    document.getElementById('areaOcupadaInmueble').value = !isEmpty(record.area_ocupada) ? record.area_ocupada : '';
+    document.getElementById('dormitoriosInmueble').value = !isEmpty(record.dormitorios) ? record.dormitorios : '';
+    document.getElementById('banosInmueble').value = !isEmpty(record.banos) ? record.banos : '';
+    document.getElementById('antiguedadInmueble').value = record.antiguedad || '';
+    document.getElementById('pisoInmueble').value = record.piso || '';
+    document.getElementById('ascensorInmueble').value = record.ascensor || '';
+    document.getElementById('estacionamientosInmueble').value = !isEmpty(record.estacionamientos) ? record.estacionamientos : '';
     document.getElementById('direccion').value = record.direccion || '';
     document.getElementById('linkUbicacion').value = record.link_ubicacion || '';
     document.getElementById('precioVenta').value = !isEmpty(record.precio_venta) ? formatAmt(record.precio_venta) : '';
@@ -5695,6 +5794,17 @@
       tipo_inmueble: document.getElementById('tipoInmueble').value,
       distrito: document.getElementById('distrito').value,
       metraje: document.getElementById('metraje').value,
+      // Características opcionales del inmueble a evaluar — alimentan el
+      // área equivalente del ACM y, al buscar con IA, le piden candidatos
+      // más parecidos (mismos dormitorios/baños/antigüedad, no solo mismo
+      // metraje).
+      area_ocupada: parseNum(document.getElementById('areaOcupadaInmueble').value) || null,
+      dormitorios: parseNum(document.getElementById('dormitoriosInmueble').value) || null,
+      banos: parseNum(document.getElementById('banosInmueble').value) || null,
+      antiguedad: document.getElementById('antiguedadInmueble').value,
+      piso: document.getElementById('pisoInmueble').value,
+      ascensor: document.getElementById('ascensorInmueble').value,
+      estacionamientos: parseNum(document.getElementById('estacionamientosInmueble').value) || null,
       direccion: document.getElementById('direccion').value,
       link_ubicacion: document.getElementById('linkUbicacion').value,
       compra_items: collectItems('tb-compra'),
