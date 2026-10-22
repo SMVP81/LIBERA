@@ -764,6 +764,12 @@
         <div class="title">Dashboard de Resultados</div>
         <div class="desc">KPIs, rentabilidad y cumplimiento consolidados, con filtros por año, mes, socio, estado y distrito.</div>
       </div>
+      <!-- Sistema de ventas (CRM + bot de WhatsApp): app aparte en Firebase. Solo socios. Se abre en otra pestaña. -->
+      <div class="module-card" id="moduleCardVentas" onclick="window.open('https://libera-9b567.web.app/#inmuebles', '_blank', 'noopener')" style="display:none;">
+        <div class="icon">🤝</div>
+        <div class="title">Ventas (CRM)</div>
+        <div class="desc">Inmuebles en venta, interesados del bot de WhatsApp, visitas y ofertas.</div>
+      </div>
       <div class="module-card add-module" onclick="alert('Cuéntame qué módulo necesitas y lo agrego aquí.')">
         <div style="font-size:20px;">+</div>
         <div>Nuevo módulo</div>
@@ -2051,6 +2057,7 @@
     document.getElementById('appbarActions').innerHTML = '';
     document.getElementById('moduleCardFinanciero').style.display = (currentUser && currentUser.role === 'socio') ? '' : 'none';
     document.getElementById('moduleCardResultados').style.display = (currentUser && currentUser.role === 'socio') ? '' : 'none';
+    document.getElementById('moduleCardVentas').style.display = (currentUser && currentUser.role === 'socio') ? '' : 'none';
     currentFichaId = null;
     renderFichaList();
   }
