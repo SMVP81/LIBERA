@@ -1023,6 +1023,7 @@
         <div class="photo-grid" id="photoGrid"></div>
         <div class="no-print" style="margin-top:6px;">
           <button class="btn-small" onclick="addPhotoCard()">+ Agregar foto</button>
+          <button class="btn-small" id="btnPegarFoto" onclick="pegarFotoDesdeBoton()" title="Copia una imagen (clic derecho → Copiar imagen, o una captura de pantalla) y pégala aquí. También funciona con Ctrl+V en la ficha.">📋 Pegar foto copiada</button>
         </div>
 
         <div class="docs-title no-print" id="docsTitle">Documentos (copia literal, partida registral, tasación, etc.)</div>
@@ -5120,6 +5121,63 @@
   async function handlePhotoUpload(input, id) {
     const file = input.files[0];
     if (!file) return;
+    await subirFotoEnTarjeta(file, id);
+  }
+
+  // ---- Pegar una foto copiada (clic derecho → "Copiar imagen", o una captura) ----
+  // Las imágenes copiadas llegan como PNG muy pesados: se pasan a JPEG (máx. 1920 px,
+  // calidad 85%) antes de subirlas por el mismo camino que "Click para subir foto".
+  async function fotoPegadaComoArchivo(blob) {
+    try {
+      const bmp = await createImageBitmap(blob);
+      const escala = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * escala); c.height = Math.round(bmp.height * escala);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(bmp, 0, 0, c.width, c.height);
+      const jpg = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.85));
+      if (jpg) return new File([jpg], 'foto-pegada-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+    } catch (e) { /* si no se puede convertir, se sube tal cual */ }
+    const ext = (blob.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
+    return new File([blob], 'foto-pegada-' + Date.now() + '.' + ext, { type: blob.type || 'image/png' });
+  }
+  async function pegarFotoEnFicha(blob) {
+    if (!blob || !/^image\//.test(blob.type)) { showToast('Lo copiado no es una imagen.'); return; }
+    // Usa la primera tarjeta vacía; si no hay, agrega una.
+    let card = Array.from(document.querySelectorAll('#photoGrid .photo-card')).find(c => !c.dataset.url && c.querySelector('.photo-placeholder').textContent.indexOf('Subiendo') < 0);
+    if (!card) card = addPhotoCard();
+    const file = await fotoPegadaComoArchivo(blob);
+    await subirFotoEnTarjeta(file, card.id);
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  async function pegarFotoDesdeBoton() {
+    if (!navigator.clipboard || !navigator.clipboard.read) { showToast('Tu navegador no deja pegar con el botón: haz clic en la ficha y presiona Ctrl+V.'); return; }
+    try {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const tipo = it.types.find(t => /^image\//.test(t));
+        if (tipo) { await pegarFotoEnFicha(await it.getType(tipo)); return; }
+      }
+      showToast('No hay una imagen copiada. Copia una foto (clic derecho → Copiar imagen) y vuelve a intentar.');
+    } catch (e) {
+      showToast('No se pudo leer lo copiado: presiona Ctrl+V en la ficha (fuera de los cuadros de texto).');
+    }
+  }
+  // Ctrl+V con una imagen copiada, estando en la ficha y fuera de un cuadro de texto.
+  document.addEventListener('paste', (e) => {
+    const grid = document.getElementById('photoGrid');
+    if (!grid || !grid.offsetParent) return; // la ficha no está abierta
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const items = Array.from((e.clipboardData && e.clipboardData.items) || []);
+    const img = items.find(it => it.kind === 'file' && /^image\//.test(it.type));
+    if (!img) return;
+    e.preventDefault();
+    pegarFotoEnFicha(img.getAsFile());
+  });
+
+  async function subirFotoEnTarjeta(file, id) {
     const card = document.getElementById(id);
     const img = card.querySelector('.photo-img');
     card.querySelector('.photo-placeholder').textContent = 'Subiendo…';
@@ -5414,7 +5472,9 @@
   // al buscar. Fichas guardadas antes de la v3 abren con el ajuste apagado.
   const ACM_B_TAMANO = -0.25;
   const ACM_AJ_TAM_CALCULO = 0.12;
-  const ACM_MIN_COMPARABLES = 5;
+  // Mínimo 3 (pedido de Samuel, 23-oct-2026). Con 3 o 4 el resultado sale con confianza baja.
+  const ACM_MIN_COMPARABLES = 3;
+  const ACM_COMPARABLES_CONFIANZA = 5;
   const ACM_EXTREMO = 0.20;          // ±20% de la mediana = extremo, sale del cálculo
   const ACM_DISPERSION_ALERTA = 0.15;
   const ACM_TASACION_ALERTA = 0.15;
@@ -5469,10 +5529,12 @@
       if (c.distancia_m > lim) return { nivel: 'malo', texto: 'A ' + (c.distancia_tipo === 'aprox' || c.distancia_tipo === 'calle' ? '≈ ' : '') + acmFmtDist(c.distancia_m) + ' del inmueble: fuera del radio de ' + acmFmtDist(radio) + '.' };
     }
     if (c.verificacion === 'verificado') return { nivel: 'ok', texto: c.verificacion_detalle || 'Verificado automáticamente.' };
-    // Copiado del portal por el usuario (estaba publicado) y con dirección con número dentro del radio.
-    if (c.verificacion === 'portal' && !c._vigente) {
-      if (c.distancia_m != null && c.distancia_tipo !== 'calle' && c.distancia_m <= acmRadioMax()) return { nivel: 'ok', texto: c.verificacion_detalle || 'Copiado del portal.' };
-      return { nivel: 'manual', texto: (c.verificacion_detalle || 'Copiado del portal.') + ' Confirma en el mapa del aviso que está a menos de ' + acmFmtDist(acmRadioMax()) + ' y marca "Vigente y cerca".' };
+    // Enviado por el usuario desde el portal: él ya lo revisó, así que cuenta como ✅
+    // (las notas del sistema, p.ej. "solo se ubicó la calle", se siguen mostrando).
+    if (c.origen === 'portal') {
+      const nota = String(c.verificacion_detalle || 'Enviado desde el portal.')
+        .replace(/:\s*(confirma|confírmalo)[^.]*\./gi, '.').replace(/\s*(confirma|confírmalo) en el (mapa|aviso)[^.]*\./gi, '').trim();
+      return { nivel: 'ok', texto: 'Lo enviaste tú. ' + nota };
     }
     if (c._vigente) return { nivel: 'ok', texto: 'Verificado a mano' + (c._vigente_fecha ? ' el ' + c._vigente_fecha : '') + '.' };
     const cerca = c.distancia_m == null ? ' Confirma también que está a menos de ' + acmFmtDist(acmRadioMax()) + ' del inmueble.' : '';
@@ -5694,7 +5756,7 @@
       const numCell = (campo, v, suf) => editable
         ? '<input class="acm-ia-edit" type="text" value="' + (v != null ? v : '') + '" onchange="acmIaEditar(' + i + ',\'' + campo + '\',this.value)" />'
         : (v != null ? acmEsc(v) + (suf || '') : 'No informado');
-      const vigente = (nivel === 'manual' || (nivel === 'ok' && c.verificacion !== 'verificado'))
+      const vigente = c.origen !== 'portal' && (nivel === 'manual' || (nivel === 'ok' && c.verificacion !== 'verificado'))
         ? '<label class="acm-ia-vigente"><input type="checkbox" ' + (c._vigente ? 'checked' : '') + ' onchange="acmIaMarcarVigente(' + i + ', this.checked)" /> ' + (c.distancia_m == null ? 'Vigente y cerca' : 'Vigente') + '</label>' : '';
       const publicado = c.dias_publicado != null ? 'hace ' + c.dias_publicado + ' d' : '—';
       return (
@@ -5874,10 +5936,11 @@
     const valorAviso = mediana * areaEquivInmueble;
     const valorCierre = valorAviso * (1 - descuentoPct / 100);
     const valorConservador = p25 * areaEquivInmueble * (1 - descuentoPct / 100);
-    const confianza = (usados.length >= 8 && cv < 0.10) ? 'alto' : (cv <= ACM_DISPERSION_ALERTA ? 'medio' : 'bajo');
+    const confianza = usados.length < ACM_COMPARABLES_CONFIANZA ? 'bajo' : ((usados.length >= 8 && cv < 0.10) ? 'alto' : (cv <= ACM_DISPERSION_ALERTA ? 'medio' : 'bajo'));
 
     const avisos = [];
     if (extremos) avisos.push(extremos + ' comparable(s) excluido(s) por estar a más de ±20% de la mediana.');
+    if (usados.length < ACM_COMPARABLES_CONFIANZA) avisos.push('Solo ' + usados.length + ' comparables: el valor es una referencia. Con ' + ACM_COMPARABLES_CONFIANZA + ' o más es más confiable.');
     if (nReferencia) avisos.push(nReferencia + ' comparable(s) quedaron solo como referencia: su tamaño necesita más de ±' + Math.round(ACM_AJ_TAM_CALCULO * 100) + '% de ajuste.');
     if (cv > ACM_DISPERSION_ALERTA) avisos.push('Los precios por m² varían mucho entre sí (' + Math.round(cv * 100) + '%): la muestra es poco homogénea.');
     if (faltaTc) avisos.push('Falta el tipo de cambio: los avisos en dólares no se están contando.');
