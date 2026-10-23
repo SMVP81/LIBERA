@@ -413,6 +413,8 @@
   .acm-btn-principal { background: #146C43 !important; color: #fff !important; border-color: #146C43 !important; }
   .acm-radio-label { font-size: 10.5px; color: #33465e; margin: 0 6px; }
   .acm-portales { font-size: 10.5px; color: #33465e; margin-top: 8px; }
+  .acm-portal-box { margin-top: 10px; padding: 8px 10px; background: #EEF6F0; border: 1px solid #BFDCC8; border-radius: 7px; }
+  .acm-marcador { display: inline-block; margin-left: 4px; padding: 3px 10px; border-radius: 6px; background: #146C43; color: #fff !important; font-weight: bold; text-decoration: none; cursor: grab; }
   .acm-pegar-aviso { margin-top: 8px; font-size: 10.5px; }
   .acm-pegar-aviso summary { cursor: pointer; font-weight: bold; color: #1b3a5e; }
   .acm-pegar-aviso input, .acm-pegar-aviso textarea { width: 100%; box-sizing: border-box; font-size: 10.5px; margin: 5px 0; font-family: inherit; }
@@ -909,7 +911,7 @@
           <div class="acm-ia-hint" id="acmSujetoInfo"></div>
           <div class="acm-ia-hint">Usa la dirección (o el link de Google Maps de la ficha, si lo pegaste), el metraje y los dormitorios de arriba. La búsqueda con IA tiene un costo pequeño (API de Anthropic); la de cercanos y la de links pegados son gratis.</div>
           <div class="acm-links-box no-print">
-            <label class="acm-subject-title" for="acmLinksPegados">📋 Pegar links de avisos (recomendado · gratis)</label>
+            <label class="acm-subject-title" for="acmLinksPegados">📋 Pegar links de avisos (gratis · tendrás que tipear precio y m²)</label>
             <div class="acm-hint">Busca tú en Urbania, Adondevivir, Babilonia o Remax y pega aquí los links de los avisos (uno por línea, máximo 15). Solo se aceptan avisos de UN inmueble, no páginas de resultados.</div>
             <textarea id="acmLinksPegados" rows="3" placeholder="https://urbania.pe/inmueble/clasificado/...&#10;https://babilonia.pe/inmueble/..."></textarea>
             <button class="btn-small" id="btnValidarLinksAcm" onclick="validarLinksPegadosAcm()">✔ Validar y agregar links</button>
@@ -919,6 +921,19 @@
               <button class="btn-small" onclick="abrirPortalAcm('babilonia')">🔗 Babilonia</button>
             </div>
             <div class="acm-hint">Consejo: ordena por "más recientes" y usa la vista de mapa para quedarte cerca de la dirección.</div>
+            <div class="acm-portal-box">
+              <div class="acm-subject-title">➕ Traer los avisos del portal con sus datos (gratis · recomendado)</div>
+              <div class="acm-hint"><b>Una sola vez:</b> arrastra este botón a tu barra de marcadores (si no la ves, presiona Ctrl+Shift+B) →
+                <a id="acmMarcador" class="acm-marcador" href="#" draggable="true" onclick="event.preventDefault(); showToast('No lo hagas clic aquí: arrástralo a tu barra de marcadores. Luego úsalo en la página de Urbania, Adondevivir o Babilonia.')">➕ Enviar al ACM</a></div>
+              <div class="acm-hint"><b>Cada vez:</b> 1) Abre el portal con los botones de arriba (o una página de un aviso). 2) Aprieta «➕ Enviar al ACM» en tu barra de marcadores: copia precio, m², dormitorios, cocheras, dirección y link de los avisos que ves. 3) Vuelve aquí y aprieta:</div>
+              <button class="btn-small" id="btnPegarPortalAcm" onclick="pegarAvisosPortalAcm()">📋 Pegar avisos del portal</button>
+              <div id="acmPortalManual" style="display:none;">
+                <div class="acm-hint">Tu navegador no dejó leer lo copiado. Haz clic en el cuadro, presiona Ctrl+V y luego «Procesar».</div>
+                <textarea id="acmPortalDatos" rows="2" placeholder="Pega aquí (Ctrl+V)"></textarea>
+                <button class="btn-small" onclick="procesarAvisosPortalAcm(document.getElementById('acmPortalDatos').value)">✔ Procesar</button>
+              </div>
+              <div class="acm-hint">Se descartan solos los de tamaño o dormitorios muy distintos y los que quedan lejos. Cada página de resultados trae 15 a 30 avisos: si quieres más, pasa a la página 2 y repite.</div>
+            </div>
             <details class="acm-pegar-aviso">
               <summary>🧠 Pegar un aviso completo para que la IA lo lea (evita tipear precio y m² · ~1 centavo)</summary>
               <div class="acm-hint">1) Abre el aviso. 2) Copia su link y pégalo abajo. 3) En la página del aviso presiona Ctrl+A y luego Ctrl+C. 4) Pega el texto abajo y aprieta "Leer aviso". Cada dato que lea la IA trae la frase del aviso de donde salió; lo que no tenga respaldo se borra solo.</div>
@@ -932,7 +947,7 @@
           <div class="acm-ia-panel no-print" id="acmIaPanel" style="display:none;">
             <div class="photos-title" style="margin-top:0;">🔎 Comparables (cercanos, IA y links pegados)</div>
             <div class="acm-hint" id="acmIaNota"></div>
-            <div class="acm-ia-leyenda">✅ verificado · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo). Solo cuentan los ✅.</div>
+            <div class="acm-ia-leyenda">✅ verificado o copiado del portal y cerca · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo). Solo cuentan los ✅.</div>
             <div class="acm-ia-toolbar">
               <button class="btn-small" onclick="acmIaSeleccionarTodas(true)">Seleccionar todas</button>
               <button class="btn-small" onclick="acmIaSeleccionarTodas(false)">Deseleccionar todas</button>
@@ -1457,6 +1472,12 @@
         if (error) throw error;
         return data;
       },
+      // Avisos copiados con el botón "➕ Enviar al ACM" en la página del portal (sin IA, sin costo de API).
+      async pegarPortalACM(datos, inmueble) {
+        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: { ...(inmueble || {}), modo: 'portal', datos } });
+        if (error) throw error;
+        return data;
+      },
       async listOportunidades() {
         const { data, error } = await sb.from('oportunidades').select('*').order('updated_at', { ascending: false });
         if (error) throw error;
@@ -1771,6 +1792,20 @@
             dormitorios: 2, banos: 2, antiguedad: '10 años', piso: '4', ascensor: 'Sí', estacionamientos: 1, estado_conservacion: 'bueno', ubicacion_relativa: 'No informado', similitud: 'medio',
             distancia_m: 420, distancia_tipo: 'aprox', verificacion: 'manual', verificacion_detalle: '(Demo) Datos leídos del aviso que pegaste. Revisa precio y m² y marca "Vigente".',
             lectura: { precio_original: { valor: 260000, cita: 'USD 260,000' }, area_techada: { valor: 110, cita: '110 m² techados' } } }] };
+      },
+      async pegarPortalACM(datos, inmueble) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        let d = null; try { d = typeof datos === 'string' ? JSON.parse(datos) : datos; } catch (e) { d = null; }
+        if (!d || d.libera_acm !== 1) return { error: 'Lo pegado no viene del botón «Enviar al ACM».' };
+        const radio = Number(inmueble && inmueble.radio_max) || 1000;
+        return { version: 2, revision: '2.3', modo: 'portal', tipo_cambio: { valor: 3.438, fecha: '(demo)', fuente: 'Demo' }, radio_max: radio,
+          descartados: [{ link: 'https://urbania.pe/inmueble/clasificado/demo-grande-9999999', motivo: 'Tamaño muy distinto (200 m² contra 118 m² del inmueble).' }],
+          nota: 'Resultado de EJEMPLO (modo demo): ' + (d.avisos || []).length + ' aviso(s) copiado(s).',
+          candidatos: (d.avisos || []).slice(0, 3).map((a, i) => ({ link: a.link, origen: 'portal', fuente: 'Urbania', direccion: a.direccion || '(Demo) Calle ' + (i + 1), moneda: 'USD',
+            precio_original: a.precio_usd, precio_usd: a.precio_usd, area_techada: a.area_techada ?? a.area_total, area_ocupada: a.area_total, dormitorios: a.dormitorios, banos: a.banos,
+            antiguedad: 'No informado', piso: 'No informado', ascensor: 'No informado', estacionamientos: a.cocheras, estado_conservacion: 'No informado', ubicacion_relativa: 'No informado', similitud: 'medio',
+            distancia_m: [140, 730, 950][i], distancia_tipo: ['aprox', 'aprox', 'calle'][i], verificacion: i < 2 ? 'portal' : 'manual',
+            verificacion_detalle: 'Copiado de Urbania el ' + String(d.fecha || '').slice(0, 10) + ' (estaba publicado en ese momento).' + (i === 2 ? ' ⚠ La dirección no tiene número: confirma en el mapa del aviso que está cerca y marca "Vigente y cerca".' : '') })) };
       },
       async buscarCercanosACM(inmueble) {
         await new Promise(resolve => setTimeout(resolve, 400));
@@ -5300,6 +5335,47 @@
     }
   }
 
+  // Botón de la barra de marcadores "➕ Enviar al ACM". Corre en la página del
+  // portal que el usuario está viendo (Urbania/Adondevivir bloquean al servidor,
+  // no a su navegador), lee los avisos visibles y los copia. Nunca copia teléfonos
+  // ni nombres. El código fuente legible está en acm-v2/marcador.js.
+  const ACM_MARCADOR = "(()=>{const l=e=>String(e||\"\").replace(/\\s+/g,\" \").trim(),d=e=>{if(!e)return null;const t=Number(String(e).replace(/[.,](?=\\d{3}(\\D|$))/g,\"\").replace(\",\",\".\"));return Number.isFinite(t)?t:null},m=e=>{e=String(e||\"\");const t=e.match(/(?:USD|US\\$|U\\$S)\\s?([\\d.,]+)/i),o=e.match(/S\\/\\.?\\s?([\\d.,]+)/);return{usd:t?d(t[1]):null,pen:o?d(o[1]):null}},b=e=>{e=String(e||\"\");const t=o=>{const r=e.match(o);return r?d(r[1]):null};return{tot:t(/([\\d.,]+)\\s*m\u00b2\\s*tot/i),cub:t(/([\\d.,]+)\\s*m\u00b2\\s*(?:cub|tech|constr)/i),dorm:t(/(\\d+)\\s*dorm/i),banos:t(/(\\d+)\\s*ba\u00f1os?/i),estac:t(/(\\d+)\\s*estac/i),anios:t(/(\\d+)\\s*a\u00f1os/i)}},s=[],g=document.querySelectorAll('[data-qa=\"posting PROPERTY\"]');if(g.length)g.forEach(e=>{const t=c=>{const i=e.querySelector('[data-qa=\"'+c+'\"]');return i?l(i.innerText):\"\"},o=e.getAttribute(\"data-to-posting\");if(!o)return;const r=m(t(\"POSTING_CARD_PRICE\")),n=b(t(\"POSTING_CARD_FEATURES\")),a=e.querySelector('[class*=\"location-address\"]');s.push({link:location.origin+o.split(\"?\")[0],precio_usd:r.usd,precio_pen:r.pen,area_total:n.tot,area_techada:n.cub,dormitorios:n.dorm,banos:n.banos,cocheras:n.estac,antiguedad_anios:n.anios,direccion:l(a&&a.innerText),zona:t(\"POSTING_CARD_LOCATION\")})});else if(/\\/(inmueble|propiedades)\\/clasificado\\/|babilonia\\.pe\\/inmueble\\//.test(location.href)){const t=document.body.innerText.slice(0,2500),o=[...document.querySelectorAll('script[type=\"application/ld+json\"]')].map(i=>{try{return JSON.parse(i.textContent)}catch{return null}}).find(i=>i&&/Apartment|House|Residence|SingleFamily/i.test(JSON.stringify(i[\"@type\"]||\"\"))),r=(t.match(/(?:Venta|Precio)[^\\n]{0,80}/i)||[\"\"])[0],n=m(r||t),a=b(t),c=o&&o.address||{};s.push({link:location.href.split(\"?\")[0].split(\"#\")[0],precio_usd:n.usd,precio_pen:n.pen,area_total:a.tot??(o&&o.floorSize?d(o.floorSize.value):null),area_techada:a.cub,dormitorios:a.dorm??(o?o.numberOfBedrooms??null:null),banos:a.banos??(o?o.numberOfBathroomsTotal??null:null),cocheras:a.estac,antiguedad_anios:a.anios,direccion:l([c.streetAddress,c.addressRegion].filter(Boolean).join(\", \")),zona:l(c.addressLocality)})}const u=JSON.stringify({libera_acm:1,v:1,portal:location.hostname.replace(/^www\\./,\"\"),pagina:location.href.split(\"?\")[0],fecha:new Date().toISOString(),avisos:s});window.__liberaAcm=u;const p=(e,t)=>{const o=document.createElement(\"div\");o.textContent=e,o.style.cssText=\"position:fixed;top:16px;right:16px;z-index:2147483647;max-width:340px;padding:12px 16px;border-radius:10px;font:14px/1.35 Arial,sans-serif;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);background:\"+(t?\"#146C43\":\"#8a1212\"),document.body.appendChild(o),setTimeout(()=>o.remove(),7e3)};if(!s.length){p(\"LIBERA: aqu\\xED no encontr\\xE9 avisos. Abre una p\\xE1gina de resultados o un aviso de Urbania, Adondevivir o Babilonia.\",!1);return}const f=()=>p(\"LIBERA: \"+s.length+\" aviso(s) copiado(s). Ve al ACM y aprieta \\xAB\\u{1F4CB} Pegar avisos del portal\\xBB.\",!0),h=()=>{const e=document.createElement(\"textarea\");e.value=u,document.body.appendChild(e),e.select();try{document.execCommand(\"copy\"),f()}catch{p(\"LIBERA: no se pudo copiar. Intenta de nuevo.\",!1)}e.remove()};navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(u).then(f,h):h()})();";
+  function acmPrepararMarcador() {
+    const a = document.getElementById('acmMarcador');
+    if (a) a.setAttribute('href', 'javascript:' + encodeURIComponent(ACM_MARCADOR));
+  }
+  async function pegarAvisosPortalAcm() {
+    let texto = '';
+    try { if (navigator.clipboard && navigator.clipboard.readText) texto = await navigator.clipboard.readText(); } catch (e) { texto = ''; }
+    if (!texto) { document.getElementById('acmPortalManual').style.display = ''; document.getElementById('acmPortalDatos').focus(); return; }
+    await procesarAvisosPortalAcm(texto);
+  }
+  async function procesarAvisosPortalAcm(texto) {
+    let d = null;
+    try { d = JSON.parse(String(texto || '').trim()); } catch (e) { d = null; }
+    if (!d || d.libera_acm !== 1 || !Array.isArray(d.avisos)) { showToast('Lo copiado no viene del botón «➕ Enviar al ACM». En la página del portal aprieta ese botón y vuelve a intentar.'); return; }
+    if (!d.avisos.length) { showToast('No había avisos en lo copiado.'); return; }
+    const inmueble = acmDatosInmueble();
+    if (!(parseNum(inmueble.metraje) > 0)) { showToast('Completa primero el metraje del inmueble.'); return; }
+    if (!inmueble.direccion && !inmueble.link_ubicacion) { showToast('Escribe primero la dirección del inmueble.'); return; }
+    const btn = document.getElementById('btnPegarPortalAcm');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Procesando ' + d.avisos.length + ' aviso(s)…';
+    try {
+      const resultado = await db.pegarPortalACM(JSON.stringify(d), inmueble);
+      if (resultado && resultado.error) { showToast(resultado.error); return; }
+      const n = acmIaAplicarRespuesta(resultado, 'portal');
+      document.getElementById('acmPortalDatos').value = '';
+      document.getElementById('acmPortalManual').style.display = 'none';
+      const nDesc = ((resultado && resultado.descartados) || []).length;
+      showToast(n + ' aviso(s) agregado(s)' + (nDesc ? ', ' + nDesc + ' descartado(s) (tamaño, dormitorios o distancia: mira el detalle).' : '.'));
+    } catch (e) {
+      showToast('No se pudieron procesar los avisos: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
+  }
+
   // Comparables cercanos: avisos VIGENTES de Babilonia alrededor del inmueble,
   // ya verificados y con su distancia exacta. Gratis (no usa la IA).
   async function buscarCercanosAcm() {
@@ -5410,10 +5486,16 @@
     // radio tal cual; con distancia aproximada (por dirección) se da 50% de margen.
     if (c.distancia_m != null) {
       const radio = acmRadioMax();
-      const lim = c.distancia_tipo === 'aprox' ? radio * 1.5 : radio;
-      if (c.distancia_m > lim) return { nivel: 'malo', texto: 'A ' + (c.distancia_tipo === 'aprox' ? '≈ ' : '') + acmFmtDist(c.distancia_m) + ' del inmueble: fuera del radio de ' + acmFmtDist(radio) + '.' };
+      // "calle": el mapa solo ubicó la calle (sin número): puede errar mucho, por eso 3 veces el radio y siempre a mano.
+      const lim = c.distancia_tipo === 'aprox' ? radio * 1.5 : c.distancia_tipo === 'calle' ? radio * 3 : radio;
+      if (c.distancia_m > lim) return { nivel: 'malo', texto: 'A ' + (c.distancia_tipo === 'aprox' || c.distancia_tipo === 'calle' ? '≈ ' : '') + acmFmtDist(c.distancia_m) + ' del inmueble: fuera del radio de ' + acmFmtDist(radio) + '.' };
     }
     if (c.verificacion === 'verificado') return { nivel: 'ok', texto: c.verificacion_detalle || 'Verificado automáticamente.' };
+    // Copiado del portal por el usuario (estaba publicado) y con dirección con número dentro del radio.
+    if (c.verificacion === 'portal' && !c._vigente) {
+      if (c.distancia_m != null && c.distancia_tipo !== 'calle' && c.distancia_m <= acmRadioMax()) return { nivel: 'ok', texto: c.verificacion_detalle || 'Copiado del portal.' };
+      return { nivel: 'manual', texto: (c.verificacion_detalle || 'Copiado del portal.') + ' Confirma en el mapa del aviso que está a menos de ' + acmFmtDist(acmRadioMax()) + ' y marca "Vigente y cerca".' };
+    }
     if (c._vigente) return { nivel: 'ok', texto: 'Verificado a mano' + (c._vigente_fecha ? ' el ' + c._vigente_fecha : '') + '.' };
     const cerca = c.distancia_m == null ? ' Confirma también que está a menos de ' + acmFmtDist(acmRadioMax()) + ' del inmueble.' : '';
     if (!c.verificacion) return { nivel: 'manual', texto: 'De una búsqueda anterior a la verificación: ábrelo, revisa precio y m² y marca "Vigente".' + cerca };
@@ -5487,8 +5569,10 @@
         // Ya estaba: si ahora viene verificado por el sistema, reemplaza a la
         // fila anterior (sin verificar), conservando si estaba seleccionada.
         const i = acmIaCandidatos.findIndex(x => claveDe(x) === clave);
-        if (i >= 0 && ((c.verificacion === 'verificado' && acmIaCandidatos[i].verificacion !== 'verificado') || (origen === 'texto' && c.lectura))) {
-          acmIaCandidatos[i] = { ...c, origen: origen === 'texto' ? 'manual' : (acmIaCandidatos[i].origen || 'manual'), _selected: true };
+        const vieja = i >= 0 ? acmIaCandidatos[i] : null;
+        const portalMejora = origen === 'portal' && vieja && !vieja._vigente && vieja.verificacion !== 'verificado' && vieja.verificacion !== 'portal' && !vieja.lectura;
+        if (i >= 0 && ((c.verificacion === 'verificado' && vieja.verificacion !== 'verificado') || (origen === 'texto' && c.lectura) || portalMejora)) {
+          acmIaCandidatos[i] = { ...c, origen: origen === 'texto' ? 'manual' : origen === 'portal' ? 'portal' : (acmIaCandidatos[i].origen || 'manual'), _selected: true };
           nuevos++;
         }
         return;
@@ -5611,7 +5695,7 @@
           (c.lectura && Object.keys(c.lectura).length ? '<span class="acm-ia-lectura" title="' + acmEsc(Object.entries(c.lectura).map(([k, v]) => k.replace(/_/g, ' ') + ': ' + v.valor + '  ←  «' + v.cita + '»').join('\n')) + '">📄 datos leídos por la IA (pasa el mouse)</span>' : '') +
           vigente + '</td>' +
         '<td>' + (c.direccion ? acmEsc(c.direccion) : '—') + '</td>' +
-        '<td>' + (c.distancia_m != null ? (c.distancia_tipo === 'aprox' ? '≈ ' : '') + acmFmtDist(c.distancia_m) : '<span title="Sin ubicación: confírmalo al abrir el aviso">—</span>') + '</td>' +
+        '<td>' + (c.distancia_m != null ? (c.distancia_tipo === 'aprox' ? '≈ ' : '') + acmFmtDist(c.distancia_m) + (c.distancia_tipo === 'calle' ? '<br><small title="El mapa solo ubicó la calle, no el número">≈ calle</small>' : '') : '<span title="Sin ubicación: confírmalo al abrir el aviso">—</span>') + '</td>' +
         '<td>' + precioCell + '</td>' +
         '<td>' + numCell('area_techada', c.area_techada, ' m²') + '</td>' +
         '<td>' + (c.area_ocupada != null ? acmEsc(c.area_ocupada) + ' m²' : 'No informado') + '</td>' +
@@ -7752,6 +7836,7 @@
   }
 
   /* ===== Arranque ===== */
+  acmPrepararMarcador();
   document.getElementById('demoBanner').style.display = DEMO_MODE ? 'block' : 'none';
   if (DEMO_MODE && MOCK_AUTH_STATE === 'signup') {
     showAuthPanel('auth-signup');
