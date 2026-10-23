@@ -376,6 +376,9 @@
   table.acm-ia-table td.acm-ia-check { text-align: center; padding: 4px 2px; }
   tr.acm-ia-row.is-outlier td { background: #FDEFE6; }
   tr.acm-ia-row.is-unselected { opacity: 0.55; }
+  tr.acm-ia-row.is-ref td { color: #6B7A8C; }
+  .acm-ia-ajtam { color: #5A6B80; }
+  .acm-ia-ref { color: #8a5a00; font-weight: bold; }
   tr.acm-ia-row.is-sin-fuente td { background: #FBE4E4; }
   .acm-ia-sin-fuente { color: #8a1212; font-weight: bold; font-size: 9.5px; white-space: nowrap; }
   .acm-ia-sin-fuente-tag { color: #8a1212; }
@@ -386,6 +389,8 @@
   .acm-ia-outlier-flag { font-size: 9px; color: #c0392b; margin-left: 3px; }
   .acm-ia-ajustes { display: flex; gap: 16px; flex-wrap: wrap; font-size: 10.5px; color: #33465e; margin: 10px 0; }
   .acm-ia-ajustes input { width: 46px; font-size: 10.5px; padding: 2px 4px; }
+  .acm-ia-ajustes label.acm-ia-check-label { display: inline-flex; align-items: center; gap: 4px; }
+  .acm-ia-ajustes input[type="checkbox"] { width: auto; margin: 0; padding: 0; }
   .acm-ia-resultado { margin-top: 10px; }
   .acm-ia-resultado .acm-ia-valor-box { background: #F0F6FF; border: 1px solid #C9DCF5; border-radius: 7px; padding: 10px 12px; font-size: 11.5px; color: #1b3a5e; }
   .acm-ia-resultado .acm-ia-valor-box b.price { color: #146C43; font-size: 13px; }
@@ -909,30 +914,27 @@
           </label>
           <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar también con IA (Urbania/Adondevivir · con costo)</button>
           <div class="acm-ia-hint" id="acmSujetoInfo"></div>
-          <div class="acm-ia-hint">Usa la dirección (o el link de Google Maps de la ficha, si lo pegaste), el metraje y los dormitorios de arriba. La búsqueda con IA tiene un costo pequeño (API de Anthropic); la de cercanos y la de links pegados son gratis.</div>
+          <div class="acm-ia-hint">Usa la dirección (o el link de Google Maps de la ficha, si lo pegaste), el metraje y los dormitorios de arriba. La búsqueda con IA tiene un costo pequeño (API de Anthropic); la de cercanos y los avisos que envías desde los portales son gratis.</div>
           <div class="acm-links-box no-print">
-            <label class="acm-subject-title" for="acmLinksPegados">📋 Pegar links de avisos (gratis · tendrás que tipear precio y m²)</label>
-            <div class="acm-hint">Busca tú en Urbania, Adondevivir, Babilonia o Remax y pega aquí los links de los avisos (uno por línea, máximo 15). Solo se aceptan avisos de UN inmueble, no páginas de resultados.</div>
-            <textarea id="acmLinksPegados" rows="3" placeholder="https://urbania.pe/inmueble/clasificado/...&#10;https://babilonia.pe/inmueble/..."></textarea>
-            <button class="btn-small" id="btnValidarLinksAcm" onclick="validarLinksPegadosAcm()">✔ Validar y agregar links</button>
-            <div class="acm-portales">Buscar en los portales (se abren con el distrito de la ficha):
+            <div class="acm-portales" style="margin-top:0;">Buscar en los portales (se abren con el distrito de la ficha):
               <button class="btn-small" onclick="abrirPortalAcm('urbania')">🔗 Urbania</button>
               <button class="btn-small" onclick="abrirPortalAcm('adondevivir')">🔗 Adondevivir</button>
               <button class="btn-small" onclick="abrirPortalAcm('babilonia')">🔗 Babilonia</button>
             </div>
             <div class="acm-hint">Consejo: ordena por "más recientes" y usa la vista de mapa para quedarte cerca de la dirección.</div>
             <div class="acm-portal-box">
-              <div class="acm-subject-title">➕ Traer los avisos del portal con sus datos (gratis · recomendado)</div>
+              <div class="acm-subject-title">➕ Enviar avisos al ACM, uno por uno (gratis)</div>
               <div class="acm-hint"><b>Una sola vez:</b> arrastra este botón a tu barra de marcadores (si no la ves, presiona Ctrl+Shift+B) →
-                <a id="acmMarcador" class="acm-marcador" href="#" draggable="true" onclick="event.preventDefault(); showToast('No lo hagas clic aquí: arrástralo a tu barra de marcadores. Luego úsalo en la página de Urbania, Adondevivir o Babilonia.')">➕ Enviar al ACM</a></div>
-              <div class="acm-hint"><b>Cada vez:</b> 1) Abre el portal con los botones de arriba (o una página de un aviso). 2) Aprieta «➕ Enviar al ACM» en tu barra de marcadores: copia precio, m², dormitorios, cocheras, dirección y link de los avisos que ves. 3) Vuelve aquí y aprieta:</div>
-              <button class="btn-small" id="btnPegarPortalAcm" onclick="pegarAvisosPortalAcm()">📋 Pegar avisos del portal</button>
+                <a id="acmMarcador" class="acm-marcador" href="#" draggable="true" onclick="event.preventDefault(); showToast('No lo hagas clic aquí: arrástralo a tu barra de marcadores. Luego úsalo en la página de un aviso de Urbania, Adondevivir o Babilonia.')">➕ Enviar al ACM</a>
+                <br>Si ya lo tenías, bórralo de tu barra y arrastra este de nuevo (cambió).</div>
+              <div class="acm-hint"><b>Cada vez:</b> 1) Abre el portal con los botones de arriba. 2) Entra a un aviso que te sirva y aprieta «➕ Enviar al ACM» en tu barra: se agrega a tu lista con precio, m², dormitorios, cocheras, antigüedad y dirección. 3) Repite con todos los avisos que quieras. 4) Al terminar, vuelve aquí y aprieta:</div>
+              <button class="btn-small" id="btnPegarPortalAcm" onclick="pegarAvisosPortalAcm()">📋 Pegar avisos enviados</button>
               <div id="acmPortalManual" style="display:none;">
                 <div class="acm-hint">Tu navegador no dejó leer lo copiado. Haz clic en el cuadro, presiona Ctrl+V y luego «Procesar».</div>
                 <textarea id="acmPortalDatos" rows="2" placeholder="Pega aquí (Ctrl+V)"></textarea>
                 <button class="btn-small" onclick="procesarAvisosPortalAcm(document.getElementById('acmPortalDatos').value)">✔ Procesar</button>
               </div>
-              <div class="acm-hint">Se descartan solos los de tamaño o dormitorios muy distintos y los que quedan lejos. Cada página de resultados trae 15 a 30 avisos: si quieres más, pasa a la página 2 y repite.</div>
+              <div class="acm-hint">Recién ahí se validan todos juntos: se descartan solos los de tamaño o dormitorios muy distintos y los que quedan lejos. La primera vez, el navegador puede preguntar si el portal puede ver lo copiado: dale «Permitir» (así se juntan avisos de varios portales). Para empezar otra ficha, aprieta el botón en una página de resultados y elige «Vaciar lista».</div>
             </div>
             <details class="acm-pegar-aviso">
               <summary>🧠 Pegar un aviso completo para que la IA lo lea (evita tipear precio y m² · ~1 centavo)</summary>
@@ -945,9 +947,9 @@
           <div class="acm-summary" id="acmSummary"></div>
 
           <div class="acm-ia-panel no-print" id="acmIaPanel" style="display:none;">
-            <div class="photos-title" style="margin-top:0;">🔎 Comparables (cercanos, IA y links pegados)</div>
+            <div class="photos-title" style="margin-top:0;">🔎 Comparables (cercanos, IA y avisos enviados)</div>
             <div class="acm-hint" id="acmIaNota"></div>
-            <div class="acm-ia-leyenda">✅ verificado o copiado del portal y cerca · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo). Solo cuentan los ✅.</div>
+            <div class="acm-ia-leyenda">✅ verificado o copiado del portal y cerca · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo) · 📏 solo referencia (tamaño muy distinto). Solo cuentan los ✅.</div>
             <div class="acm-ia-toolbar">
               <button class="btn-small" onclick="acmIaSeleccionarTodas(true)">Seleccionar todas</button>
               <button class="btn-small" onclick="acmIaSeleccionarTodas(false)">Deseleccionar todas</button>
@@ -985,6 +987,9 @@
               <label>Tipo de cambio (S/ por US$):
                 <input type="text" id="acmIaTipoCambio" placeholder="3.43" oninput="renderAcmIaTabla(); programarAutoguardadoFicha()" />
                 <span class="acm-ia-hint" id="acmIaTipoCambioFuente"></span>
+              </label>
+              <label class="acm-ia-check-label" title="Lleva el S//m² de cada comparable al tamaño de este inmueble (los más grandes valen menos por m²)">
+                <input type="checkbox" id="acmAjusteTamano" checked onchange="renderAcmIaTabla(); programarAutoguardadoFicha()" /> Ajustar por tamaño
               </label>
               <label>Valor de 1 cochera (S/, para ajustar):
                 <input type="text" id="acmIaValorCochera" placeholder="Ej. 50,000" style="width:70px;" oninput="renderAcmIaTabla(); programarAutoguardadoFicha()" />
@@ -5335,11 +5340,12 @@
     }
   }
 
-  // Botón de la barra de marcadores "➕ Enviar al ACM". Corre en la página del
-  // portal que el usuario está viendo (Urbania/Adondevivir bloquean al servidor,
-  // no a su navegador), lee los avisos visibles y los copia. Nunca copia teléfonos
-  // ni nombres. El código fuente legible está en acm-v2/marcador.js.
-  const ACM_MARCADOR = "(()=>{const l=e=>String(e||\"\").replace(/\\s+/g,\" \").trim(),d=e=>{if(!e)return null;const t=Number(String(e).replace(/[.,](?=\\d{3}(\\D|$))/g,\"\").replace(\",\",\".\"));return Number.isFinite(t)?t:null},m=e=>{e=String(e||\"\");const t=e.match(/(?:USD|US\\$|U\\$S)\\s?([\\d.,]+)/i),o=e.match(/S\\/\\.?\\s?([\\d.,]+)/);return{usd:t?d(t[1]):null,pen:o?d(o[1]):null}},b=e=>{e=String(e||\"\");const t=o=>{const r=e.match(o);return r?d(r[1]):null};return{tot:t(/([\\d.,]+)\\s*m\u00b2\\s*tot/i),cub:t(/([\\d.,]+)\\s*m\u00b2\\s*(?:cub|tech|constr)/i),dorm:t(/(\\d+)\\s*dorm/i),banos:t(/(\\d+)\\s*ba\u00f1os?/i),estac:t(/(\\d+)\\s*estac/i),anios:t(/(\\d+)\\s*a\u00f1os/i)}},s=[],g=document.querySelectorAll('[data-qa=\"posting PROPERTY\"]');if(g.length)g.forEach(e=>{const t=c=>{const i=e.querySelector('[data-qa=\"'+c+'\"]');return i?l(i.innerText):\"\"},o=e.getAttribute(\"data-to-posting\");if(!o)return;const r=m(t(\"POSTING_CARD_PRICE\")),n=b(t(\"POSTING_CARD_FEATURES\")),a=e.querySelector('[class*=\"location-address\"]');s.push({link:location.origin+o.split(\"?\")[0],precio_usd:r.usd,precio_pen:r.pen,area_total:n.tot,area_techada:n.cub,dormitorios:n.dorm,banos:n.banos,cocheras:n.estac,antiguedad_anios:n.anios,direccion:l(a&&a.innerText),zona:t(\"POSTING_CARD_LOCATION\")})});else if(/\\/(inmueble|propiedades)\\/clasificado\\/|babilonia\\.pe\\/inmueble\\//.test(location.href)){const t=document.body.innerText.slice(0,2500),o=[...document.querySelectorAll('script[type=\"application/ld+json\"]')].map(i=>{try{return JSON.parse(i.textContent)}catch{return null}}).find(i=>i&&/Apartment|House|Residence|SingleFamily/i.test(JSON.stringify(i[\"@type\"]||\"\"))),r=(t.match(/(?:Venta|Precio)[^\\n]{0,80}/i)||[\"\"])[0],n=m(r||t),a=b(t),c=o&&o.address||{};s.push({link:location.href.split(\"?\")[0].split(\"#\")[0],precio_usd:n.usd,precio_pen:n.pen,area_total:a.tot??(o&&o.floorSize?d(o.floorSize.value):null),area_techada:a.cub,dormitorios:a.dorm??(o?o.numberOfBedrooms??null:null),banos:a.banos??(o?o.numberOfBathroomsTotal??null:null),cocheras:a.estac,antiguedad_anios:a.anios,direccion:l([c.streetAddress,c.addressRegion].filter(Boolean).join(\", \")),zona:l(c.addressLocality)})}const u=JSON.stringify({libera_acm:1,v:1,portal:location.hostname.replace(/^www\\./,\"\"),pagina:location.href.split(\"?\")[0],fecha:new Date().toISOString(),avisos:s});window.__liberaAcm=u;const p=(e,t)=>{const o=document.createElement(\"div\");o.textContent=e,o.style.cssText=\"position:fixed;top:16px;right:16px;z-index:2147483647;max-width:340px;padding:12px 16px;border-radius:10px;font:14px/1.35 Arial,sans-serif;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);background:\"+(t?\"#146C43\":\"#8a1212\"),document.body.appendChild(o),setTimeout(()=>o.remove(),7e3)};if(!s.length){p(\"LIBERA: aqu\\xED no encontr\\xE9 avisos. Abre una p\\xE1gina de resultados o un aviso de Urbania, Adondevivir o Babilonia.\",!1);return}const f=()=>p(\"LIBERA: \"+s.length+\" aviso(s) copiado(s). Ve al ACM y aprieta \\xAB\\u{1F4CB} Pegar avisos del portal\\xBB.\",!0),h=()=>{const e=document.createElement(\"textarea\");e.value=u,document.body.appendChild(e),e.select();try{document.execCommand(\"copy\"),f()}catch{p(\"LIBERA: no se pudo copiar. Intenta de nuevo.\",!1)}e.remove()};navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(u).then(f,h):h()})();";
+  // Botón de la barra de marcadores "➕ Enviar al ACM" (v2, aviso por aviso).
+  // Corre en la página de UN aviso que el usuario está viendo (Urbania/Adondevivir
+  // bloquean al servidor, no a su navegador), lo lee y lo agrega a una lista que
+  // queda copiada; al terminar se pega aquí y se valida todo junto. Nunca copia
+  // teléfonos ni nombres. El código fuente legible está en acm-v2/marcador.js.
+  const ACM_MARCADOR = "(async()=>{const f=\"libera_acm_lista\",A=e=>String(e||\"\").replace(/\\s+/g,\" \").trim(),p=e=>{if(!e)return null;const t=Number(String(e).replace(/[.,](?=\\d{3}(\\D|$))/g,\"\").replace(\",\",\".\"));return Number.isFinite(t)?t:null},T=e=>{e=String(e||\"\");const t=e.match(/(?:USD|US\\$|U\\$S)\\s?([\\d.,]+)/i),o=e.match(/S\\/\\.?\\s?([\\d.,]+)/);return{usd:t?p(t[1]):null,pen:o?p(o[1]):null}},w=\"(?:m\\xB2|m2|mt2|ha)\",_=e=>{e=String(e||\"\");const t=o=>{const a=e.match(o);return a?p(a[1]):null};return{tot:t(new RegExp(\"([\\\\d.,]+)\\\\s*\"+w+\"\\\\s*tot\",\"i\")),cub:t(new RegExp(\"([\\\\d.,]+)\\\\s*\"+w+\"\\\\s*(?:cub|tech|constr)\",\"i\")),dorm:t(/(\\d+)\\s*dorm/i),banos:t(/(\\d+)\\s*ba\u00f1os?/i),estac:t(/(\\d+)\\s*estac/i),anios:t(/(\\d+)\\s*a\u00f1os/i),estreno:/a estrenar/i.test(e)}},g=e=>{try{const t=new URL(e);return t.hostname.replace(/^www\\./,\"\")+\":\"+((t.pathname.match(/-(\\d{3,})(?:\\.html)?\\/?$/)||[])[1]||t.pathname)}catch{return String(e)}},u=(e,t,o)=>{const a=document.createElement(\"div\");if(a.style.cssText=\"position:fixed;top:16px;right:16px;z-index:2147483647;max-width:360px;padding:12px 16px;border-radius:10px;font:14px/1.4 Arial,sans-serif;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);background:\"+(t?\"#146C43\":\"#8a1212\"),a.textContent=e,o){const i=document.createElement(\"button\");i.textContent=\"Vaciar lista\",i.style.cssText=\"display:block;margin-top:8px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#146C43;font:bold 12px Arial,sans-serif;cursor:pointer\",i.onclick=()=>{try{localStorage.removeItem(f)}catch{}try{navigator.clipboard.writeText(\"\")}catch{}a.textContent=\"LIBERA: lista vac\\xEDa.\",setTimeout(()=>a.remove(),2500)},a.appendChild(i)}document.body.appendChild(a),setTimeout(()=>a.remove(),o?12e3:8e3)};let c=[];try{c=JSON.parse(localStorage.getItem(f)||\"[]\")}catch{c=[]}let R=!1,C=\"\";try{C=await navigator.clipboard.readText()}catch{R=!0}try{const e=JSON.parse(C);e&&e.libera_acm===1&&Array.isArray(e.avisos)&&(c=c.concat(e.avisos))}catch{}const k=Date.now()-12*36e5,l=new Map;for(const e of c)e&&e.link&&Date.parse(e.fecha||0)>=k&&l.set(g(e.link),e);let h=\"lista\";if(/\\/(inmueble|propiedades)\\/clasificado\\/|babilonia\\.pe\\/inmueble\\//.test(location.href)){const e=document.body.innerText,t=e.slice(0,2500),o=[...document.querySelectorAll('script[type=\"application/ld+json\"]')].map(n=>{try{return JSON.parse(n.textContent)}catch{return null}}).find(n=>n&&/Apartment|House|Residence|SingleFamily|RealEstateListing/i.test(JSON.stringify(n[\"@type\"]||\"\"))),a=o&&(o.mainEntity||o)||{},i=(t.match(/(?:Venta|Precio)[^\\n]{0,80}/i)||[\"\"])[0],m=T(i||t),I=[...document.querySelectorAll('li[class*=\"feature\"]')].map(n=>n.innerText).join(`\n`),r=_(I||t),d=a.address||{},v=n=>A(String(n||\"\").replace(/,?\\s*(Lima,\\s*)*Per[u\u00fa].*$/i,\"\")),E=(e.slice(0,8e3).match(/(pre-?venta|en planos|entrega (?:estimada|prevista|en)[^\\n]{0,40}|en construcci[o\u00f3]n)/i)||[])[0],O={link:location.href.split(\"?\")[0].split(\"#\")[0],fecha:new Date().toISOString(),precio_usd:m.usd,precio_pen:m.pen,area_total:r.tot??(a.floorSize?p(a.floorSize.value??a.floorSize):null),area_techada:r.cub,dormitorios:r.dorm??a.numberOfBedrooms??null,banos:r.banos??a.numberOfBathroomsTotal??null,cocheras:r.estac,antiguedad_anios:r.anios,a_estrenar:r.estreno||void 0,alerta:E?A(E).slice(0,60):void 0,direccion:[v(d.streetAddress),v(d.addressRegion||d.addressLocality)].filter(Boolean).join(\", \"),zona:v(d.addressRegion||d.addressLocality)},S=g(O.link);h=l.has(S)?\"repetido\":\"nuevo\",l.delete(S),l.set(S,O)}const s=[...l.values()];try{localStorage.setItem(f,JSON.stringify(s))}catch{}const b=JSON.stringify({libera_acm:1,v:2,fecha:new Date().toISOString(),avisos:s});window.__liberaAcm=b;const x={};for(const e of s){const t=g(e.link).split(\":\")[0].replace(/\\..*$/,\"\");x[t]=(x[t]||0)+1}const y=s.length+\" aviso(s) en la lista\"+(s.length?\" (\"+Object.entries(x).map(([e,t])=>t+\" \"+e).join(\", \")+\")\":\"\")+\".\";if(!await(async()=>{try{return await navigator.clipboard.writeText(b),!0}catch{const t=document.createElement(\"textarea\");t.value=b,document.body.appendChild(t),t.select();let o=!1;try{o=document.execCommand(\"copy\")}catch{o=!1}return t.remove(),o}})()){u(\"LIBERA: el aviso qued\\xF3 en la lista, pero no se pudo copiar. Aprieta el bot\\xF3n otra vez.\",!1);return}const L=R?\" (Tu navegador no deja juntar avisos de distintos portales: si usas varios, pega en el ACM la lista de cada portal por separado.)\":\"\";h===\"nuevo\"?u(\"LIBERA: aviso agregado \\u2713 \"+y+\" Sigue con el pr\\xF3ximo. Al terminar, ve al ACM y aprieta \\xAB\\u{1F4CB} Pegar avisos enviados\\xBB.\"+L,!0):h===\"repetido\"?u(\"LIBERA: ese aviso ya estaba en la lista. \"+y,!0):u(\"LIBERA: aqu\\xED no hay un aviso. Abre UN aviso y aprieta el bot\\xF3n. \"+y,!!s.length,s.length>0)})();";
   function acmPrepararMarcador() {
     const a = document.getElementById('acmMarcador');
     if (a) a.setAttribute('href', 'javascript:' + encodeURIComponent(ACM_MARCADOR));
@@ -5368,7 +5374,7 @@
       document.getElementById('acmPortalDatos').value = '';
       document.getElementById('acmPortalManual').style.display = 'none';
       const nDesc = ((resultado && resultado.descartados) || []).length;
-      showToast(n + ' aviso(s) agregado(s)' + (nDesc ? ', ' + nDesc + ' descartado(s) (tamaño, dormitorios o distancia: mira el detalle).' : '.'));
+      showToast(n + ' aviso(s) agregado(s) de ' + d.avisos.length + ' enviado(s)' + (nDesc ? ', ' + nDesc + ' descartado(s) (tamaño, dormitorios o distancia: mira el detalle).' : '.'));
     } catch (e) {
       showToast('No se pudieron procesar los avisos: ' + (e && e.message ? e.message : e));
     } finally {
@@ -5397,30 +5403,6 @@
     }
   }
 
-  // Links pegados a mano: se validan con las mismas reglas (formato de aviso
-  // individual, aviso vigente en Babilonia, tipo de cambio del día), sin IA
-  // ni costo de API. Se AGREGAN a la lista actual, no la reemplazan.
-  async function validarLinksPegadosAcm() {
-    const ta = document.getElementById('acmLinksPegados');
-    const links = Array.from(new Set((ta.value || '').split(/[\s,]+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s))));
-    if (!links.length) { showToast('Pega al menos un link que empiece con https://'); return; }
-    if (links.length > 15) { showToast('Máximo 15 links por vez.'); return; }
-    const btn = document.getElementById('btnValidarLinksAcm');
-    const original = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Validando…';
-    try {
-      const resultado = await db.validarLinksACM(links, acmDatosInmueble());
-      if (resultado && resultado.error) { showToast('No se pudieron validar: ' + resultado.error); return; }
-      const nuevos = acmIaAplicarRespuesta(resultado, 'links');
-      ta.value = '';
-      showToast(nuevos + ' link(s) agregado(s)' + ((resultado.descartados || []).length ? ', ' + resultado.descartados.length + ' descartado(s) — mira el detalle.' : '.'));
-    } catch (e) {
-      showToast('No se pudieron validar los links: ' + (e && e.message ? e.message : e));
-    } finally {
-      btn.disabled = false; btn.textContent = original;
-    }
-  }
-
   /* ===== ACM v2: candidatos → verificación (semáforo) → cálculo =====
      acmIaCandidatos guarda la lista (búsqueda con IA + links pegados), con la
      selección y las verificaciones a mano del usuario. El precio en soles, el
@@ -5435,7 +5417,15 @@
   let acmIaTipoCambioInfo = null;
   let acmIaUltimoResultado = null;
   let acmIaSujetoInfo = null;
-  const ACM_VERSION = 2;
+  const ACM_VERSION = 3;
+  // Ajuste por tamaño (v3): el S//m² baja cuando el departamento es más grande.
+  // Medido el 23-oct-2026 con 240 avisos vigentes de Babilonia a 1.5 km de
+  // Casimiro Ulloa 353, Miraflores: S//m² ~ área^-0.25 (cada +10% de área, ~-2.5%).
+  // Hasta ±12% de ajuste el comparable entra al cálculo (pesa menos mientras más
+  // ajuste necesita); de 12% a 15% queda solo como referencia; más de 15% se descarta
+  // al buscar. Fichas guardadas antes de la v3 abren con el ajuste apagado.
+  const ACM_B_TAMANO = -0.25;
+  const ACM_AJ_TAM_CALCULO = 0.12;
   const ACM_MIN_COMPARABLES = 5;
   const ACM_EXTREMO = 0.20;          // ±20% de la mediana = extremo, sale del cálculo
   const ACM_DISPERSION_ALERTA = 0.15;
@@ -5630,6 +5620,32 @@
     return s[lo] + (s[hi] - s[lo]) * (pos - lo);
   }
 
+  // Ajuste por tamaño de un comparable respecto del inmueble (0.11 = +11%), o null.
+  function acmAjusteTamano(c) {
+    const chk = document.getElementById('acmAjusteTamano');
+    if (!chk || !chk.checked) return null;
+    const suj = parseNum(document.getElementById('metraje').value);
+    const comp = c.area_techada > 0 ? c.area_techada : (c.area_ocupada > 0 ? c.area_ocupada : null);
+    if (!(suj > 0) || !(comp > 0)) return null;
+    return Math.pow(suj / comp, ACM_B_TAMANO) - 1;
+  }
+
+  // Percentil ponderado (cada valor cuenta según su peso). Con pesos iguales
+  // da lo mismo que acmMediana / acmPercentil, para no cambiar resultados viejos.
+  function acmPercentilPonderado(vals, pesos, p) {
+    if (!vals.length) return null;
+    if (pesos.every(w => w === pesos[0])) return p === 0.5 ? acmMediana(vals) : acmPercentil(vals, p);
+    const pares = vals.map((v, i) => [v, pesos[i]]).sort((a, b) => a[0] - b[0]);
+    const total = pares.reduce((a, x) => a + x[1], 0);
+    let acum = 0;
+    const pos = pares.map(([v, w]) => { const c = (acum + w / 2) / total; acum += w; return [c, v]; });
+    if (p <= pos[0][0]) return pos[0][1];
+    for (let i = 1; i < pos.length; i++) {
+      if (p <= pos[i][0]) { const [c0, v0] = pos[i - 1], [c1, v1] = pos[i]; return v0 + (v1 - v0) * (p - c0) / (c1 - c0); }
+    }
+    return pos[pos.length - 1][1];
+  }
+
   function acmIaCalcularFilas() {
     const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
     const filas = acmIaCandidatos.map((c, idx) => {
@@ -5637,12 +5653,17 @@
       const precioS = acmIaPrecioSoles(c);
       const precioAj = acmIaPrecioAjustado(c);
       const areaEquiv = acmIaAreaEquivalente(c, coefPct);
-      const pm2Equiv = (areaEquiv > 0 && precioAj > 0) ? precioAj / areaEquiv : null;
-      return { ...c, _idx: idx, _estado: estado, _precioS: precioS, _precioAj: precioAj, _areaEquiv: areaEquiv, _pm2Equiv: pm2Equiv };
+      const aj = acmAjusteTamano(c);
+      const pm2Base = (areaEquiv > 0 && precioAj > 0) ? precioAj / areaEquiv : null;
+      const pm2Equiv = pm2Base != null ? pm2Base * (1 + (aj || 0)) : null;
+      const soloRef = aj != null && Math.abs(aj) > ACM_AJ_TAM_CALCULO;
+      // Peso: 1 sin ajuste, 0.5 con el ajuste máximo permitido (12%).
+      const peso = aj != null ? Math.max(0.5, 1 - Math.abs(aj) / (2 * ACM_AJ_TAM_CALCULO)) : 1;
+      return { ...c, _idx: idx, _estado: estado, _precioS: precioS, _precioAj: precioAj, _areaEquiv: areaEquiv, _pm2Base: pm2Base, _pm2Equiv: pm2Equiv, _ajTam: aj, _soloRef: soloRef, _peso: peso };
     });
-    const medianaOk = acmMediana(filas.filter(c => c._estado.nivel === 'ok' && c._pm2Equiv != null).map(c => c._pm2Equiv));
+    const medianaOk = acmMediana(filas.filter(c => c._estado.nivel === 'ok' && !c._soloRef && c._pm2Equiv != null).map(c => c._pm2Equiv));
     filas.forEach(c => {
-      c._outlier = !!(medianaOk && c._pm2Equiv != null && Math.abs(c._pm2Equiv / medianaOk - 1) > ACM_EXTREMO);
+      c._outlier = !c._soloRef && !!(medianaOk && c._pm2Equiv != null && Math.abs(c._pm2Equiv / medianaOk - 1) > ACM_EXTREMO);
     });
     return filas;
   }
@@ -5689,7 +5710,7 @@
         ? '<label class="acm-ia-vigente"><input type="checkbox" ' + (c._vigente ? 'checked' : '') + ' onchange="acmIaMarcarVigente(' + i + ', this.checked)" /> ' + (c.distancia_m == null ? 'Vigente y cerca' : 'Vigente') + '</label>' : '';
       const publicado = c.dias_publicado != null ? 'hace ' + c.dias_publicado + ' d' : '—';
       return (
-        '<tr class="acm-ia-row is-' + nivel + (c._outlier ? ' is-outlier' : '') + (c._selected ? '' : ' is-unselected') + '">' +
+        '<tr class="acm-ia-row is-' + nivel + (c._outlier ? ' is-outlier' : '') + (c._soloRef ? ' is-ref' : '') + (c._selected ? '' : ' is-unselected') + '">' +
         '<td class="acm-ia-check"><input type="checkbox" ' + (c._selected ? 'checked' : '') + (nivel === 'malo' ? ' disabled' : '') + ' onchange="acmIaToggleRow(' + i + ', this.checked)" /></td>' +
         '<td class="acm-ia-estado-cell"><span class="acm-ia-estado" title="' + acmEsc(c._estado.texto) + '">' + ICONO[nivel] + '</span><span class="acm-ia-estado-txt">' + acmEsc(c._estado.texto) + '</span>' +
           (c.lectura && Object.keys(c.lectura).length ? '<span class="acm-ia-lectura" title="' + acmEsc(Object.entries(c.lectura).map(([k, v]) => k.replace(/_/g, ' ') + ': ' + v.valor + '  ←  «' + v.cita + '»').join('\n')) + '">📄 datos leídos por la IA (pasa el mouse)</span>' : '') +
@@ -5700,7 +5721,9 @@
         '<td>' + numCell('area_techada', c.area_techada, ' m²') + '</td>' +
         '<td>' + (c.area_ocupada != null ? acmEsc(c.area_ocupada) + ' m²' : 'No informado') + '</td>' +
         '<td>' + (c._areaEquiv != null ? c._areaEquiv.toFixed(1) + ' m²' : '—') + '</td>' +
-        '<td>' + (c._pm2Equiv != null ? fmt(c._pm2Equiv) : '—') + outlierFlag + '</td>' +
+        '<td>' + (c._pm2Equiv != null ? fmt(c._pm2Equiv) : '—') + outlierFlag +
+          (c._ajTam != null && c._pm2Equiv != null && Math.abs(c._ajTam) >= 0.005 ? '<br><small class="acm-ia-ajtam" title="S//m² del aviso: ' + fmt(c._pm2Base) + ', llevado al tamaño del inmueble">tamaño ' + (c._ajTam > 0 ? '+' : '') + Math.round(c._ajTam * 100) + '%</small>' : '') +
+          (c._soloRef ? '<br><small class="acm-ia-ref">📏 solo referencia</small>' : '') + '</td>' +
         '<td>' + numCell('dormitorios', c.dormitorios) + '</td>' +
         '<td>' + noInf(c.banos) + '</td>' +
         '<td>' + noInf(c.antiguedad) + '</td>' +
@@ -5742,7 +5765,7 @@
     const countEl = document.getElementById('acmIaCount');
     if (!countEl) return;
     const filas = acmIaCalcularFilas();
-    const ok = filas.filter(c => c._selected && c._estado.nivel === 'ok').length;
+    const ok = filas.filter(c => c._selected && c._estado.nivel === 'ok' && !c._soloRef).length;
     const manual = filas.filter(c => c._estado.nivel === 'manual').length;
     countEl.textContent = ok + ' ✅ seleccionado(s) de ' + ACM_MIN_COMPARABLES + ' mínimos' + (manual ? ' · ' + manual + ' ⚠️ por verificar' : '');
   }
@@ -5822,7 +5845,9 @@
     const resultadoEl = document.getElementById('acmIaResultado');
     const filas = acmIaCalcularFilas();
     const pendientes = filas.filter(c => c._estado.nivel === 'manual').length;
-    const elegibles = filas.filter(c => c._selected && c._estado.nivel === 'ok' && c._pm2Equiv != null);
+    const elegibles = filas.filter(c => c._selected && c._estado.nivel === 'ok' && !c._soloRef && c._pm2Equiv != null);
+    const nReferencia = filas.filter(c => c._selected && c._estado.nivel === 'ok' && c._soloRef).length;
+    const conAjuste = !!(document.getElementById('acmAjusteTamano') || {}).checked;
 
     const metrajeInmueble = parseNum(document.getElementById('metraje').value);
     if (!(metrajeInmueble > 0)) {
@@ -5844,7 +5869,7 @@
         '<div style="margin-top:6px;">No se sugiere precio para no tomar una decisión con datos insuficientes. Para completar:</div>' +
         '<ul style="margin:4px 0 0 18px;">' +
           (pendientes ? '<li>Verifica los ' + pendientes + ' ⚠️: ábrelos, revisa precio y m² y marca "Vigente".</li>' : '') +
-          '<li>Pega más links de avisos parecidos (cuadro "Pegar links").</li>' +
+          '<li>Envía más avisos parecidos con «➕ Enviar al ACM».</li>' +
           (extremos ? '<li>' + extremos + ' comparable(s) quedaron fuera por estar a más de ±20% del resto.</li>' : '') +
           (faltaTc ? '<li>Ingresa el tipo de cambio.</li>' : '') +
         '</ul></div>';
@@ -5853,8 +5878,9 @@
     }
 
     const pm2 = usados.map(c => c._pm2Equiv);
-    const mediana = acmMediana(pm2);
-    const p25 = acmPercentil(pm2, 0.25);
+    const pesos = usados.map(c => c._peso || 1);
+    const mediana = acmPercentilPonderado(pm2, pesos, 0.5);
+    const p25 = acmPercentilPonderado(pm2, pesos, 0.25);
     const promedio = pm2.reduce((a, b) => a + b, 0) / pm2.length;
     const cv = Math.sqrt(pm2.reduce((a, b) => a + Math.pow(b - promedio, 2), 0) / pm2.length) / promedio;
     const valorAviso = mediana * areaEquivInmueble;
@@ -5864,6 +5890,7 @@
 
     const avisos = [];
     if (extremos) avisos.push(extremos + ' comparable(s) excluido(s) por estar a más de ±20% de la mediana.');
+    if (nReferencia) avisos.push(nReferencia + ' comparable(s) quedaron solo como referencia: su tamaño necesita más de ±' + Math.round(ACM_AJ_TAM_CALCULO * 100) + '% de ajuste.');
     if (cv > ACM_DISPERSION_ALERTA) avisos.push('Los precios por m² varían mucho entre sí (' + Math.round(cv * 100) + '%): la muestra es poco homogénea.');
     if (faltaTc) avisos.push('Falta el tipo de cambio: los avisos en dólares no se están contando.');
     const tasValor = parseNum(document.getElementById('tasacionValor').value);
@@ -5884,12 +5911,13 @@
       mediana_m2: Math.round(mediana), valor_aviso: Math.round(valorAviso), valor_cierre: Math.round(valorCierre),
       valor_conservador: Math.round(valorConservador), descuento: descuentoPct, tipo_cambio: acmIaTipoCambio() || null,
       tasacion_valor: tasValor || null, tasacion_fecha: tasFecha || null,
+      ajuste_tamano: conAjuste ? { exponente: ACM_B_TAMANO, limite_calculo: ACM_AJ_TAM_CALCULO, medido: '2026-10-23 Miraflores (Babilonia)' } : null,
     };
 
     resultadoEl.innerHTML =
       avisos.map(a => '<div class="acm-warning">⚠ ' + acmEsc(a) + '</div>').join('') +
       '<div class="acm-ia-valor-box">' +
-        '<div>S//m² equivalente (mediana): <b>' + fmt(mediana) + '</b> (rango ' + fmt(Math.min(...pm2)) + ' – ' + fmt(Math.max(...pm2)) + ', ' + usados.length + ' comparables ✅)' +
+        '<div>S//m² equivalente' + (conAjuste ? ' ajustado por tamaño (mediana ponderada)' : ' (mediana)') + ': <b>' + fmt(mediana) + '</b> (rango ' + fmt(Math.min(...pm2)) + ' – ' + fmt(Math.max(...pm2)) + ', ' + usados.length + ' comparables ✅)' +
         '<span class="acm-ia-confianza ' + confianza + '">Confianza: ' + confianza + '</span></div>' +
         '<div style="margin-top:6px;">Valor de aviso (' + areaEquivInmueble.toFixed(1) + ' m² × mediana): <b class="price">' + fmt(valorAviso) + '</b></div>' +
         '<div>Cierre probable (−' + descuentoPct + '% de negociación): <b class="price">' + fmt(valorCierre) + '</b></div>' +
@@ -6111,7 +6139,8 @@
     document.getElementById('acmIaResultado').innerHTML = '';
     document.getElementById('acmIaCoefSinTechar').value = '50';
     document.getElementById('acmIaDescuentoNegociacion').value = '6';
-    ['acmIaTipoCambio', 'acmIaValorCochera', 'acmLinksPegados', 'tasacionFecha', 'tasacionValor'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('acmAjusteTamano').checked = true;
+    ['acmIaTipoCambio', 'acmIaValorCochera', 'acmPortalDatos', 'tasacionFecha', 'tasacionValor'].forEach(id => { document.getElementById(id).value = ''; });
     seedDefaults();
     addPhotoCard(); addPhotoCard(); addPhotoCard();
   }
@@ -6192,11 +6221,14 @@
       // vacío (sus precios ya estaban en soles) y nada se recalcula solo.
       document.getElementById('acmIaTipoCambio').value = !isEmpty(acmIa.tipo_cambio) ? acmIa.tipo_cambio : '';
       document.getElementById('acmIaValorCochera').value = !isEmpty(acmIa.valor_cochera) ? formatAmt(acmIa.valor_cochera) : '';
+      // Fichas guardadas antes de la v3 no tenían ajuste por tamaño: abren sin él para no cambiar su resultado.
+      document.getElementById('acmAjusteTamano').checked = acmIa.ajuste_tamano === true;
       document.getElementById('acmIaPanel').style.display = '';
       renderAcmIaTabla();
     } else {
       acmIaCandidatos = [];
       acmIaNotaTexto = '';
+      document.getElementById('acmAjusteTamano').checked = true;
       acmIaDescartados = [];
       acmIaTipoCambioInfo = null;
       acmIaSujetoInfo = null;
@@ -6407,6 +6439,7 @@
         tipo_cambio: parseNum(document.getElementById('acmIaTipoCambio').value) || null,
         tipo_cambio_info: acmIaTipoCambioInfo,
         valor_cochera: parseNum(document.getElementById('acmIaValorCochera').value) || null,
+        ajuste_tamano: document.getElementById('acmAjusteTamano').checked,
         radio_max: acmRadioMax(),
         sujeto: acmIaSujetoInfo,
         // Foto del último cálculo (fecha, comparables, valores) — queda como
