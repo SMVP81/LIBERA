@@ -393,6 +393,23 @@
   .acm-ia-confianza.alto { background: #DFF3E3; color: #146C43; }
   .acm-ia-confianza.medio { background: #FBF0DA; color: #8a5a12; }
   .acm-ia-confianza.bajo { background: #F4E3E3; color: #8a1212; }
+  /* ACM v2: links pegados, semáforo, descartados, resultado no confiable */
+  .acm-links-box { margin-top: 10px; padding: 8px 10px; background: #F7F9FC; border: 1px solid #DCE3EC; border-radius: 7px; }
+  .acm-links-box textarea { width: 100%; box-sizing: border-box; font-size: 10.5px; margin: 6px 0; font-family: inherit; }
+  .acm-ia-leyenda { font-size: 10px; color: #5A6B80; margin: 2px 0 6px; }
+  .acm-ia-estado { display: inline-block; font-size: 12px; cursor: help; }
+  table.acm-ia-table td.acm-ia-estado-cell { min-width: 135px; }
+  .acm-ia-estado-txt { display: block; font-size: 8.5px; color: #5A6B80; max-width: 120px; line-height: 1.25; }
+  tr.acm-ia-row.is-malo td { background: #FBE4E4; opacity: 0.75; }
+  tr.acm-ia-row.is-manual td { background: #FFF8E6; }
+  table.acm-ia-table input.acm-ia-edit { width: 62px; font-size: 10px; padding: 1px 3px; }
+  table.acm-ia-table select.acm-ia-edit { font-size: 10px; padding: 0; }
+  .acm-ia-vigente { display: block; font-size: 9px; margin-top: 3px; white-space: nowrap; }
+  .acm-ia-descartados { margin: 6px 0 10px; font-size: 10.5px; color: #5A6B80; }
+  .acm-ia-descartados summary { cursor: pointer; font-weight: bold; color: #8a1212; }
+  .acm-ia-descartados li { margin: 3px 0; word-break: break-all; }
+  .acm-ia-noconfiable { background: #FBE4E4; border: 1px solid #E8B4B4; color: #8a1212; border-radius: 7px; padding: 10px 12px; font-size: 11.5px; }
+  .acm-ia-noconfiable b { font-size: 13px; }
   .docs-list-header { display: flex; gap: 8px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; color: #8a95a3; padding: 0 10px; margin-top: 8px; }
   .docs-list-header span:nth-child(1) { flex: 1; min-width: 120px; }
   .docs-list-header span:nth-child(2) { width: 170px; }
@@ -855,6 +872,11 @@
               </label>
               <label>Estacionamientos<input type="text" id="estacionamientosInmueble" placeholder="1" oninput="updateAcm()" /></label>
             </div>
+            <div class="acm-subject-title" style="margin-top:8px;">Tasación del inmueble (opcional, como referencia)</div>
+            <div class="acm-subject-grid">
+              <label>Fecha de la tasación<input type="date" id="tasacionFecha" onchange="acmIaRefrescarResultado(); programarAutoguardadoFicha()" /></label>
+              <label>Valor comercial (S/)<input type="text" id="tasacionValor" placeholder="Ej. 850,000" oninput="acmIaRefrescarResultado(); programarAutoguardadoFicha()" /></label>
+            </div>
           </div>
 
           <div class="acm-table-wrap">
@@ -868,11 +890,18 @@
           <button class="btn-small" onclick="addAcmRow()">+ Agregar comparable</button>
           <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar comparables con IA</button>
           <div class="acm-ia-hint">Usa la dirección, distrito, tipo y metraje de arriba. Cada búsqueda tiene un costo pequeño (API de Anthropic) — revisa siempre la fuente de cada candidato antes de usarlo.</div>
+          <div class="acm-links-box no-print">
+            <label class="acm-subject-title" for="acmLinksPegados">📋 Pegar links de avisos (recomendado · gratis)</label>
+            <div class="acm-hint">Busca tú en Urbania, Adondevivir, Babilonia o Remax y pega aquí los links de los avisos (uno por línea, máximo 15). Solo se aceptan avisos de UN inmueble, no páginas de resultados.</div>
+            <textarea id="acmLinksPegados" rows="3" placeholder="https://urbania.pe/inmueble/clasificado/...&#10;https://babilonia.pe/inmueble/..."></textarea>
+            <button class="btn-small" id="btnValidarLinksAcm" onclick="validarLinksPegadosAcm()">✔ Validar y agregar links</button>
+          </div>
           <div class="acm-summary" id="acmSummary"></div>
 
           <div class="acm-ia-panel no-print" id="acmIaPanel" style="display:none;">
-            <div class="photos-title" style="margin-top:0;">🔎 Candidatos encontrados por IA</div>
+            <div class="photos-title" style="margin-top:0;">🔎 Comparables (IA y links pegados)</div>
             <div class="acm-hint" id="acmIaNota"></div>
+            <div class="acm-ia-leyenda">✅ verificado · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo). Solo cuentan los ✅.</div>
             <div class="acm-ia-toolbar">
               <button class="btn-small" onclick="acmIaSeleccionarTodas(true)">Seleccionar todas</button>
               <button class="btn-small" onclick="acmIaSeleccionarTodas(false)">Deseleccionar todas</button>
@@ -890,9 +919,9 @@
               <table class="acm-table acm-ia-table">
                 <thead>
                   <tr>
-                    <th></th><th>Dirección / Zona</th><th>Precio (S/)</th><th>Área techada</th><th>Área ocupada</th>
+                    <th></th><th>Estado</th><th>Dirección / Zona</th><th>Precio</th><th>Área techada</th><th>Área ocupada</th>
                     <th>Área equiv.</th><th>S//m² equiv.</th><th>Dorm.</th><th>Baños</th><th>Antigüedad</th>
-                    <th>Piso</th><th>Ascensor</th><th>Estac.</th><th>Cercanía</th><th>Similitud</th><th>Fuente</th>
+                    <th>Piso</th><th>Ascensor</th><th>Estac.</th><th>Cercanía</th><th>Publicado</th><th>Similitud</th><th>Fuente</th>
                   </tr>
                 </thead>
                 <tbody id="acmIaRows"></tbody>
@@ -905,7 +934,18 @@
               <label>Descuento de negociación esperado (publicado → cierre):
                 <input type="text" id="acmIaDescuentoNegociacion" value="6" oninput="renderAcmIaTabla()" /> %
               </label>
+              <label>Tipo de cambio (S/ por US$):
+                <input type="text" id="acmIaTipoCambio" placeholder="3.43" oninput="renderAcmIaTabla(); programarAutoguardadoFicha()" />
+                <span class="acm-ia-hint" id="acmIaTipoCambioFuente"></span>
+              </label>
+              <label>Valor de 1 cochera (S/, para ajustar):
+                <input type="text" id="acmIaValorCochera" placeholder="Ej. 50,000" style="width:70px;" oninput="renderAcmIaTabla(); programarAutoguardadoFicha()" />
+              </label>
             </div>
+            <details class="acm-ia-descartados" id="acmIaDescartadosBox" style="display:none;">
+              <summary id="acmIaDescartadosTitulo">Descartados</summary>
+              <ul id="acmIaDescartadosLista"></ul>
+            </details>
             <button class="btn-small" id="btnCalcularValorComercial" onclick="calcularValorComercialIA()">📊 Calcular valor comercial</button>
             <button class="btn-small" onclick="agregarSeleccionadosATablaAcm()">+ Agregar seleccionados a mi tabla de arriba</button>
             <div class="acm-ia-resultado" id="acmIaResultado"></div>
@@ -1358,7 +1398,17 @@
       // así el frontend solo revisa "resultado.error" y no tiene que
       // distinguir errores de red de errores de negocio.
       async buscarComparablesACM(payload) {
-        const { data, error } = await sb.functions.invoke('acm-search', { body: payload });
+        // ACM v2: misma forma de respuesta que la v1 ({ candidatos, nota } o
+        // { error }) más verificación de cada aviso, tipo de cambio del día y
+        // la lista de descartados con su motivo. La v1 ("acm-search") sigue
+        // publicada como respaldo: para volver a ella basta cambiar el nombre.
+        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: payload });
+        if (error) throw error;
+        return data;
+      },
+      // Valida links pegados a mano (sin IA, sin costo de API).
+      async validarLinksACM(links) {
+        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: { modo: 'links', links } });
         if (error) throw error;
         return data;
       },
@@ -1667,6 +1717,19 @@
             { direccion: '(Demo) Residencial El Bosque, mismo distrito', fuente: 'Urbania', link: 'https://ejemplo-demo.pe/aviso-4', precio: 520000, area_techada: 140, area_ocupada: 140, dormitorios: 4, banos: 3, antiguedad: '2 años', piso: '10mo piso', ascensor: 'Sí', estacionamientos: 2, estado_conservacion: 'A estrenar', ubicacion_relativa: 'Aprox. 950 m', similitud: 'bajo' },
           ],
           nota: 'Resultado de EJEMPLO (modo demo) — con Supabase conectado y la llave de Anthropic configurada, aquí aparecerán candidatos reales encontrados en la web, siempre en soles.',
+        };
+      },
+      async validarLinksACM(links) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return {
+          version: 2,
+          tipo_cambio: { valor: 3.43, fecha: '(demo)', fuente: 'Demo' },
+          candidatos: links.map((link, i) => ({ link, origen: 'manual', fuente: 'Demo', direccion: '(Demo) Aviso pegado ' + (i + 1), moneda: 'USD', precio_original: null, precio: null,
+            area_techada: null, area_ocupada: null, dormitorios: null, banos: null, antiguedad: 'No informado', piso: 'No informado', ascensor: 'No informado',
+            estacionamientos: null, estado_conservacion: 'No informado', ubicacion_relativa: 'No informado', similitud: 'medio',
+            verificacion: 'manual', verificacion_detalle: '(Demo) Ábrelo, confirma que está vigente y completa precio y m².' })),
+          descartados: [],
+          nota: 'Resultado de EJEMPLO (modo demo).',
         };
       },
       async listOportunidades() {
@@ -5101,25 +5164,7 @@
         showToast('No se pudo completar la búsqueda: ' + resultado.error);
         return;
       }
-      const candidatos = (resultado && resultado.candidatos) || [];
-      acmIaNotaTexto = (resultado && resultado.nota) || '';
-      if (!candidatos.length) {
-        showToast(acmIaNotaTexto || 'La IA no encontró candidatos confiables para esta dirección.');
-        acmIaCandidatos = [];
-        document.getElementById('acmIaPanel').style.display = 'none';
-        return;
-      }
-      // Preselección sugerida por la IA: similitud alta o media empieza
-      // marcada, similitud baja empieza sin marcar — el usuario puede
-      // cambiar cualquier casilla libremente antes de calcular. Un
-      // candidato SIN fuente/link verificable nunca empieza preseleccionado
-      // (la Edge Function ya filtra estos casos, pero esto es una segunda
-      // capa de seguridad, por si algún día cambia la fuente de datos).
-      acmIaCandidatos = candidatos.map(c => ({ ...c, _selected: c.similitud !== 'bajo' && acmIaTieneLinkReal(c) }));
-      document.getElementById('acmIaResultado').innerHTML = '';
-      document.getElementById('acmIaPanel').style.display = '';
-      renderAcmIaTabla();
-      programarAutoguardadoFicha();
+      acmIaAplicarRespuesta(resultado, 'ia');
     } catch (e) {
       showToast('No se pudo completar la búsqueda: ' + (e && e.message ? e.message : e));
     } finally {
@@ -5128,25 +5173,178 @@
     }
   }
 
-  /* ===== ACM con IA: candidatos crudos → selección manual → cálculo =====
-     acmIaCandidatos guarda la última búsqueda (o lo restaurado al abrir una
-     ficha guardada). El área equivalente, el S//m² equivalente y si un
-     candidato es atípico se recalculan al vuelo cada vez que se dibuja la
-     tabla — nunca se guardan ya calculados, así cambiar el % de área sin
-     techar o el % de negociación recalcula todo al instante, sin repetir
-     la búsqueda (que es la única parte con costo). */
+  // Links pegados a mano: se validan con las mismas reglas (formato de aviso
+  // individual, aviso vigente en Babilonia, tipo de cambio del día), sin IA
+  // ni costo de API. Se AGREGAN a la lista actual, no la reemplazan.
+  async function validarLinksPegadosAcm() {
+    const ta = document.getElementById('acmLinksPegados');
+    const links = Array.from(new Set((ta.value || '').split(/[\s,]+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s))));
+    if (!links.length) { showToast('Pega al menos un link que empiece con https://'); return; }
+    if (links.length > 15) { showToast('Máximo 15 links por vez.'); return; }
+    const btn = document.getElementById('btnValidarLinksAcm');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Validando…';
+    try {
+      const resultado = await db.validarLinksACM(links);
+      if (resultado && resultado.error) { showToast('No se pudieron validar: ' + resultado.error); return; }
+      const nuevos = acmIaAplicarRespuesta(resultado, 'links');
+      ta.value = '';
+      showToast(nuevos + ' link(s) agregado(s)' + ((resultado.descartados || []).length ? ', ' + resultado.descartados.length + ' descartado(s) — mira el detalle.' : '.'));
+    } catch (e) {
+      showToast('No se pudieron validar los links: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
+  }
+
+  /* ===== ACM v2: candidatos → verificación (semáforo) → cálculo =====
+     acmIaCandidatos guarda la lista (búsqueda con IA + links pegados), con la
+     selección y las verificaciones a mano del usuario. El precio en soles, el
+     área equivalente y el S//m² se recalculan al vuelo cada vez que se dibuja
+     la tabla (así cambiar el tipo de cambio o un % recalcula todo al instante,
+     sin repetir la búsqueda, que es la única parte con costo).
+     Regla de oro: SOLO entran al cálculo los ✅ (verificados por el sistema o
+     marcados "Vigente" a mano), y hacen falta al menos ACM_MIN_COMPARABLES. */
   let acmIaCandidatos = [];
   let acmIaNotaTexto = '';
+  let acmIaDescartados = [];
+  let acmIaTipoCambioInfo = null;
+  let acmIaUltimoResultado = null;
+  const ACM_VERSION = 2;
+  const ACM_MIN_COMPARABLES = 5;
+  const ACM_EXTREMO = 0.20;          // ±20% de la mediana = extremo, sale del cálculo
+  const ACM_DISPERSION_ALERTA = 0.15;
+  const ACM_TASACION_ALERTA = 0.15;
   const ACM_IA_PESO_SIMILITUD = { alto: 1, medio: 0.6, bajo: 0.3 };
   const ACM_IA_ORDEN_CERCANIA = ['mismo edificio', 'mismo condominio', 'misma calle', 'misma urbanización'];
 
-  // Un candidato solo se considera verificable si trae un link con forma de
-  // URL real (http/https) — sin eso no hay cómo comprobar que el dato no
-  // fue inventado. La Edge Function ya descarta estos casos del lado del
-  // servidor; esto es una segunda capa, por si queda algo guardado de
-  // antes de ese filtro o si en el futuro los datos vienen de otro lado.
+  // Mismo formato de aviso que valida la Edge Function acm-search-v2 (probado
+  // el 23-oct-2026). Se repite aquí para clasificar también lo guardado antes
+  // de la v2 — esos links salen ❌ si no son de un aviso individual.
+  const ACM_PORTALES = [
+    { id: 'urbania', nombre: 'Urbania', host: /(^|\.)urbania\.pe$/i, aviso: /^\/inmueble\/clasificado\/[a-z0-9-]+-(\d{7,})(\.html)?\/?$/i, proyecto: /^\/inmueble\/proyecto\//i },
+    { id: 'adondevivir', nombre: 'Adondevivir', host: /(^|\.)adondevivir\.com$/i, aviso: /^\/propiedades\/clasificado\/[a-z0-9-]+-(\d{7,})\.html\/?$/i, proyecto: /^\/propiedades\/proyecto\//i },
+    { id: 'babilonia', nombre: 'Babilonia', host: /(^|\.)babilonia\.pe$/i, aviso: /^\/inmueble\/[a-z0-9-]+-(\d{3,})\/?$/i, proyecto: /^\/proyecto/i },
+    { id: 'remax', nombre: 'Remax', host: /(^|\.)remax\.pe$/i, aviso: /^\/propiedad-[a-z0-9+-]+-(\d{4,})\/?$/i, proyecto: /^\/proyecto/i },
+  ];
+  function acmClasificarLink(link) {
+    let u;
+    try { u = new URL(String(link || '').trim()); } catch (e) { return { ok: false, motivo: 'Sin link verificable.' }; }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false, motivo: 'Sin link verificable.' };
+    const p = ACM_PORTALES.find(x => x.host.test(u.hostname));
+    if (!p) return { ok: false, motivo: 'Portal no soportado o link de ejemplo.' };
+    if (p.proyecto.test(u.pathname)) return { ok: false, motivo: 'Es un proyecto en planos, no un aviso de un inmueble.' };
+    const m = u.pathname.match(p.aviso);
+    if (!m) return { ok: false, motivo: 'Página de listado o link sin código de aviso (probable link inventado).' };
+    return { ok: true, portal: p.id, fuente: p.nombre, clave: p.id + ':' + m[1] };
+  }
+
+  function acmEsc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  // Un candidato solo se considera verificable si trae un link de un aviso
+  // individual de un portal soportado (antes bastaba con "empezar con http").
   function acmIaTieneLinkReal(c) {
-    return !!(c && typeof c.link === 'string' && /^https?:\/\/.+/i.test(c.link));
+    return !!(c && acmClasificarLink(c.link).ok);
+  }
+
+  // ✅ ok · ⚠️ manual · ❌ malo
+  function acmIaEstado(c) {
+    const cl = acmClasificarLink(c.link);
+    if (!cl.ok) return { nivel: 'malo', texto: cl.motivo };
+    if (c.verificacion === 'verificado') return { nivel: 'ok', texto: c.verificacion_detalle || 'Verificado automáticamente.' };
+    if (c._vigente) return { nivel: 'ok', texto: 'Verificado a mano' + (c._vigente_fecha ? ' el ' + c._vigente_fecha : '') + '.' };
+    if (!c.verificacion) return { nivel: 'manual', texto: 'De una búsqueda anterior a la verificación: ábrelo, revisa precio y m² y marca "Vigente".' };
+    return { nivel: 'manual', texto: c.verificacion_detalle || 'Ábrelo, revisa precio y m² y marca "Vigente".' };
+  }
+
+  // Moneda que muestra la fila: lo guardado antes de la v2 no tiene moneda
+  // pero su precio ya estaba en soles.
+  function acmIaMonedaVista(c) {
+    if (c.moneda === 'PEN' || c.moneda === 'USD') return c.moneda;
+    return c.precio > 0 ? 'PEN' : 'USD';
+  }
+
+  function acmIaTipoCambio() {
+    return parseNum(document.getElementById('acmIaTipoCambio').value) || 0;
+  }
+
+  // Precio en soles: con moneda y precio original (v2) se convierte con el
+  // tipo de cambio de la pantalla; lo guardado antes de la v2 ya venía en
+  // soles (convertido a 3.75), así que se usa tal cual.
+  function acmIaPrecioSoles(c) {
+    if (c.precio_original > 0 && (c.moneda === 'USD' || c.moneda === 'PEN')) {
+      if (c.moneda === 'PEN') return c.precio_original;
+      const tc = acmIaTipoCambio();
+      return tc > 0 ? c.precio_original * tc : null;
+    }
+    return c.precio > 0 ? c.precio : null;
+  }
+
+  // Ajuste por cochera: lleva el comparable a la misma cantidad de cocheras
+  // que el inmueble evaluado. Solo si se conocen ambas y hay valor de cochera.
+  function acmIaPrecioAjustado(c) {
+    const p = acmIaPrecioSoles(c);
+    if (p == null) return null;
+    const valorCochera = parseNum(document.getElementById('acmIaValorCochera').value) || 0;
+    const estSujetoRaw = document.getElementById('estacionamientosInmueble').value;
+    if (!(valorCochera > 0) || c.estacionamientos == null || isEmpty(estSujetoRaw)) return p;
+    return p - (Number(c.estacionamientos) - parseNum(estSujetoRaw)) * valorCochera;
+  }
+
+  function acmIaAplicarRespuesta(resultado, origen) {
+    const candidatos = (resultado && resultado.candidatos) || [];
+    const descartados = (resultado && resultado.descartados) || [];
+    if (resultado && resultado.tipo_cambio && resultado.tipo_cambio.valor) {
+      acmIaTipoCambioInfo = resultado.tipo_cambio;
+      document.getElementById('acmIaTipoCambio').value = resultado.tipo_cambio.valor;
+    }
+    if (origen === 'ia') {
+      acmIaNotaTexto = (resultado && resultado.nota) || '';
+      // Una búsqueda nueva con IA reemplaza lo que vino de la IA, pero nunca
+      // los links pegados a mano ni sus verificaciones.
+      acmIaCandidatos = acmIaCandidatos.filter(c => c.origen === 'manual');
+      acmIaDescartados = acmIaDescartados.filter(d => d.origen === 'manual');
+    }
+    const claveDe = c => acmClasificarLink(c.link).clave || c.link;
+    // Un link que el sistema acaba de descartar (p.ej. aviso vencido) sale de
+    // la lista aunque estuviera de antes (fichas guardadas con la v1).
+    const clavesDescartadas = new Set(descartados.map(d => claveDe(d)));
+    acmIaCandidatos = acmIaCandidatos.filter(c => !clavesDescartadas.has(claveDe(c)));
+    const claves = new Set(acmIaCandidatos.map(claveDe));
+    let nuevos = 0;
+    candidatos.forEach(c => {
+      const clave = claveDe(c);
+      if (claves.has(clave)) {
+        // Ya estaba: si ahora viene verificado por el sistema, reemplaza a la
+        // fila anterior (sin verificar), conservando si estaba seleccionada.
+        const i = acmIaCandidatos.findIndex(x => claveDe(x) === clave);
+        if (i >= 0 && c.verificacion === 'verificado' && acmIaCandidatos[i].verificacion !== 'verificado') {
+          acmIaCandidatos[i] = { ...c, origen: acmIaCandidatos[i].origen || 'manual', _selected: true };
+          nuevos++;
+        }
+        return;
+      }
+      claves.add(clave);
+      const fila = { ...c, origen: origen === 'links' ? 'manual' : (c.origen || 'ia') };
+      fila._selected = acmIaEstado(fila).nivel !== 'malo' && fila.similitud !== 'bajo';
+      acmIaCandidatos.push(fila);
+      nuevos++;
+    });
+    descartados.forEach(d => acmIaDescartados.push({ ...d, origen: origen === 'links' ? 'manual' : 'ia' }));
+    if (!acmIaCandidatos.length && !acmIaDescartados.length) {
+      showToast((resultado && resultado.nota) || 'No se encontraron candidatos confiables.');
+      document.getElementById('acmIaPanel').style.display = 'none';
+      return 0;
+    }
+    if (origen === 'ia' && !candidatos.length) showToast((resultado && resultado.nota) || 'La IA no encontró candidatos confiables.');
+    document.getElementById('acmIaResultado').innerHTML = '';
+    acmIaUltimoResultado = null;
+    document.getElementById('acmIaPanel').style.display = '';
+    renderAcmIaTabla();
+    programarAutoguardadoFicha();
+    return nuevos;
   }
 
   function acmIaAreaEquivalente(c, coefPct) {
@@ -5168,76 +5366,128 @@
     return 99;
   }
 
+  function acmMediana(arr) {
+    const s = [...arr].sort((a, b) => a - b);
+    if (!s.length) return null;
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  }
+  function acmPercentil(arr, p) {
+    const s = [...arr].sort((a, b) => a - b);
+    if (!s.length) return null;
+    const pos = (s.length - 1) * p, lo = Math.floor(pos), hi = Math.ceil(pos);
+    return s[lo] + (s[hi] - s[lo]) * (pos - lo);
+  }
+
+  function acmIaCalcularFilas() {
+    const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
+    const filas = acmIaCandidatos.map((c, idx) => {
+      const estado = acmIaEstado(c);
+      const precioS = acmIaPrecioSoles(c);
+      const precioAj = acmIaPrecioAjustado(c);
+      const areaEquiv = acmIaAreaEquivalente(c, coefPct);
+      const pm2Equiv = (areaEquiv > 0 && precioAj > 0) ? precioAj / areaEquiv : null;
+      return { ...c, _idx: idx, _estado: estado, _precioS: precioS, _precioAj: precioAj, _areaEquiv: areaEquiv, _pm2Equiv: pm2Equiv };
+    });
+    const medianaOk = acmMediana(filas.filter(c => c._estado.nivel === 'ok' && c._pm2Equiv != null).map(c => c._pm2Equiv));
+    filas.forEach(c => {
+      c._outlier = !!(medianaOk && c._pm2Equiv != null && Math.abs(c._pm2Equiv / medianaOk - 1) > ACM_EXTREMO);
+    });
+    return filas;
+  }
+
   function renderAcmIaTabla() {
     const tbody = document.getElementById('acmIaRows');
     if (!tbody) return;
-    const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
-
-    const calculados = acmIaCandidatos.map((c, idx) => {
-      const areaEquiv = acmIaAreaEquivalente(c, coefPct);
-      const pm2Equiv = (areaEquiv > 0 && c.precio > 0) ? c.precio / areaEquiv : null;
-      return { ...c, _idx: idx, _areaEquiv: areaEquiv, _pm2Equiv: pm2Equiv };
-    });
-
-    // Atípicos: candidatos cuyo S//m² equivalente se aleja más de 40% de la
-    // mediana del grupo con dato — solo una señal visual para revisar antes
-    // de confiar en el resultado, no se excluyen solos del cálculo.
-    const pm2Validos = calculados.filter(c => c._pm2Equiv != null).map(c => c._pm2Equiv).sort((a, b) => a - b);
-    let medianaPm2 = null;
-    if (pm2Validos.length) {
-      const mid = Math.floor(pm2Validos.length / 2);
-      medianaPm2 = pm2Validos.length % 2 !== 0 ? pm2Validos[mid] : (pm2Validos[mid - 1] + pm2Validos[mid]) / 2;
-    }
-    calculados.forEach(c => {
-      c._outlier = !!(medianaPm2 && c._pm2Equiv != null && (c._pm2Equiv > medianaPm2 * 1.4 || c._pm2Equiv < medianaPm2 * 0.6));
-    });
-
+    const calculados = acmIaCalcularFilas();
+    const rangoNivel = { ok: 0, manual: 1, malo: 2 };
     const orden = document.getElementById('acmIaOrden').value;
     const ordenados = [...calculados].sort((a, b) => {
-      if (orden === 'precio') return (a.precio ?? Infinity) - (b.precio ?? Infinity);
+      const n = rangoNivel[a._estado.nivel] - rangoNivel[b._estado.nivel];
+      if (n !== 0) return n;
+      if (orden === 'precio') return (a._precioS ?? Infinity) - (b._precioS ?? Infinity);
       if (orden === 'pm2') return (a._pm2Equiv ?? Infinity) - (b._pm2Equiv ?? Infinity);
       if (orden === 'ubicacion') return acmIaRankCercania(a.ubicacion_relativa) - acmIaRankCercania(b.ubicacion_relativa);
       return (ACM_IA_PESO_SIMILITUD[b.similitud] || 0) - (ACM_IA_PESO_SIMILITUD[a.similitud] || 0);
     });
-
+    const ICONO = { ok: '✅', manual: '⚠️', malo: '❌' };
+    const noInf = v => (v == null || v === '' ? 'No informado' : acmEsc(v));
     tbody.innerHTML = ordenados.map(c => {
-      const outlierFlag = c._outlier ? '<span class="acm-ia-outlier-flag" title="S//m² equivalente muy distinto al resto">⚠</span>' : '';
-      const sinFuente = !acmIaTieneLinkReal(c);
-      const fuenteTxt = (c.fuente || 'Ver aviso').replace(/</g, '');
-      const linkHtml = sinFuente
-        ? '<span class="acm-ia-sin-fuente">⚠ SIN FUENTE VERIFICABLE — no uses este dato</span>'
-        : '<a href="' + c.link.replace(/"/g, '') + '" target="_blank" rel="noopener">' + fuenteTxt + '</a>';
+      const nivel = c._estado.nivel;
+      const editable = nivel === 'manual' || (nivel === 'ok' && c.verificacion !== 'verificado');
+      const i = c._idx;
+      const outlierFlag = c._outlier ? '<span class="acm-ia-outlier-flag" title="S//m² a más de ±20% de la mediana: sale del cálculo">⚠</span>' : '';
+      const cl = acmClasificarLink(c.link);
+      const linkHtml = cl.ok
+        ? '<a href="' + acmEsc(c.link) + '" target="_blank" rel="noopener">' + acmEsc(c.fuente || cl.fuente || 'Ver aviso') + '</a>'
+        : '<span class="acm-ia-sin-fuente">' + (c.link ? '<s>' + acmEsc(c.fuente || 'link') + '</s>' : '⚠ SIN FUENTE') + '</span>';
+      const precioTxt = c.precio_original > 0 && c.moneda === 'USD'
+        ? 'US$ ' + Math.round(c.precio_original).toLocaleString('es-PE') + (c._precioS ? '<br><small>' + fmt(c._precioS) + '</small>' : '<br><small>falta T.C.</small>')
+        : (c._precioS != null ? fmt(c._precioS) : 'No informado');
+      const precioCell = editable
+        ? '<select class="acm-ia-edit" onchange="acmIaEditar(' + i + ',\'moneda\',this.value)">' +
+            '<option value="USD"' + (acmIaMonedaVista(c) === 'USD' ? ' selected' : '') + '>US$</option><option value="PEN"' + (acmIaMonedaVista(c) === 'PEN' ? ' selected' : '') + '>S/</option></select>' +
+          '<input class="acm-ia-edit" type="text" value="' + (c.precio_original > 0 ? c.precio_original : (!c.moneda && c.precio > 0 ? c.precio : '')) + '" placeholder="precio" onchange="acmIaEditar(' + i + ',\'precio_original\',this.value)" />' +
+          (c._precioS && c.moneda === 'USD' ? '<br><small>' + fmt(c._precioS) + '</small>' : '')
+        : precioTxt;
+      const numCell = (campo, v, suf) => editable
+        ? '<input class="acm-ia-edit" type="text" value="' + (v != null ? v : '') + '" onchange="acmIaEditar(' + i + ',\'' + campo + '\',this.value)" />'
+        : (v != null ? acmEsc(v) + (suf || '') : 'No informado');
+      const vigente = (nivel === 'manual' || (nivel === 'ok' && c.verificacion !== 'verificado'))
+        ? '<label class="acm-ia-vigente"><input type="checkbox" ' + (c._vigente ? 'checked' : '') + ' onchange="acmIaMarcarVigente(' + i + ', this.checked)" /> Vigente</label>' : '';
+      const publicado = c.dias_publicado != null ? 'hace ' + c.dias_publicado + ' d' : '—';
       return (
-        '<tr class="acm-ia-row' + (c._outlier ? ' is-outlier' : '') + (sinFuente ? ' is-sin-fuente' : '') + (c._selected ? '' : ' is-unselected') + '">' +
-        '<td class="acm-ia-check"><input type="checkbox" ' + (c._selected ? 'checked' : '') + ' onchange="acmIaToggleRow(' + c._idx + ', this.checked)" /></td>' +
-        '<td>' + (c.direccion || '—') + (sinFuente ? ' <span class="acm-ia-sin-fuente-tag">⚠</span>' : '') + '</td>' +
-        '<td>' + (c.precio != null ? fmt(c.precio) : 'No informado') + '</td>' +
-        '<td>' + (c.area_techada != null ? c.area_techada + ' m²' : 'No informado') + '</td>' +
-        '<td>' + (c.area_ocupada != null ? c.area_ocupada + ' m²' : 'No informado') + '</td>' +
+        '<tr class="acm-ia-row is-' + nivel + (c._outlier ? ' is-outlier' : '') + (c._selected ? '' : ' is-unselected') + '">' +
+        '<td class="acm-ia-check"><input type="checkbox" ' + (c._selected ? 'checked' : '') + (nivel === 'malo' ? ' disabled' : '') + ' onchange="acmIaToggleRow(' + i + ', this.checked)" /></td>' +
+        '<td class="acm-ia-estado-cell"><span class="acm-ia-estado" title="' + acmEsc(c._estado.texto) + '">' + ICONO[nivel] + '</span><span class="acm-ia-estado-txt">' + acmEsc(c._estado.texto) + '</span>' + vigente + '</td>' +
+        '<td>' + (c.direccion ? acmEsc(c.direccion) : '—') + '</td>' +
+        '<td>' + precioCell + '</td>' +
+        '<td>' + numCell('area_techada', c.area_techada, ' m²') + '</td>' +
+        '<td>' + (c.area_ocupada != null ? acmEsc(c.area_ocupada) + ' m²' : 'No informado') + '</td>' +
         '<td>' + (c._areaEquiv != null ? c._areaEquiv.toFixed(1) + ' m²' : '—') + '</td>' +
         '<td>' + (c._pm2Equiv != null ? fmt(c._pm2Equiv) : '—') + outlierFlag + '</td>' +
-        '<td>' + (c.dormitorios ?? 'No informado') + '</td>' +
-        '<td>' + (c.banos ?? 'No informado') + '</td>' +
-        '<td>' + (c.antiguedad || 'No informado') + '</td>' +
-        '<td>' + (c.piso || 'No informado') + '</td>' +
-        '<td>' + (c.ascensor || 'No informado') + '</td>' +
-        '<td>' + (c.estacionamientos ?? 'No informado') + '</td>' +
-        '<td>' + (c.ubicacion_relativa || 'No informado') + '</td>' +
-        '<td><span class="acm-ia-badge ' + (c.similitud || 'medio') + '">' + (c.similitud || 'medio') + '</span></td>' +
+        '<td>' + numCell('dormitorios', c.dormitorios) + '</td>' +
+        '<td>' + noInf(c.banos) + '</td>' +
+        '<td>' + noInf(c.antiguedad) + '</td>' +
+        '<td>' + noInf(c.piso) + '</td>' +
+        '<td>' + noInf(c.ascensor) + '</td>' +
+        '<td>' + numCell('estacionamientos', c.estacionamientos) + '</td>' +
+        '<td>' + noInf(c.ubicacion_relativa) + '</td>' +
+        '<td>' + publicado + '</td>' +
+        '<td><span class="acm-ia-badge ' + acmEsc(c.similitud || 'medio') + '">' + acmEsc(c.similitud || 'medio') + '</span></td>' +
         '<td>' + linkHtml + '</td>' +
         '</tr>'
       );
     }).join('');
 
     document.getElementById('acmIaNota').textContent = acmIaNotaTexto || '';
+    const tcInfo = document.getElementById('acmIaTipoCambioFuente');
+    if (tcInfo) tcInfo.textContent = acmIaTipoCambioInfo ? (acmIaTipoCambioInfo.fuente + ', ' + acmIaTipoCambioInfo.fecha) : '';
+    const box = document.getElementById('acmIaDescartadosBox');
+    if (box) {
+      box.style.display = acmIaDescartados.length ? '' : 'none';
+      document.getElementById('acmIaDescartadosTitulo').textContent = '❌ ' + acmIaDescartados.length + ' descartado(s) automáticamente — ver por qué';
+      document.getElementById('acmIaDescartadosLista').innerHTML = acmIaDescartados.map(d =>
+        '<li><b>' + acmEsc(d.motivo || '') + '</b><br>' + acmEsc(d.link || '(sin link)') + '</li>').join('');
+    }
     acmIaUpdateCount();
+    acmIaRefrescarResultado();
+  }
+
+  // Si ya se calculó, cualquier cambio (tipo de cambio, verificación, %…)
+  // vuelve a calcular para que nunca se vea un resultado viejo en pantalla.
+  function acmIaRefrescarResultado() {
+    const el = document.getElementById('acmIaResultado');
+    if (el && el.innerHTML.trim()) calcularValorComercialIA({ silencioso: true });
   }
 
   function acmIaUpdateCount() {
     const countEl = document.getElementById('acmIaCount');
     if (!countEl) return;
-    const seleccionados = acmIaCandidatos.filter(c => c._selected).length;
-    countEl.textContent = seleccionados + ' de ' + acmIaCandidatos.length + ' seleccionados';
+    const filas = acmIaCalcularFilas();
+    const ok = filas.filter(c => c._selected && c._estado.nivel === 'ok').length;
+    const manual = filas.filter(c => c._estado.nivel === 'manual').length;
+    countEl.textContent = ok + ' ✅ seleccionado(s) de ' + ACM_MIN_COMPARABLES + ' mínimos' + (manual ? ' · ' + manual + ' ⚠️ por verificar' : '');
   }
 
   function acmIaToggleRow(idx, checked) {
@@ -5246,158 +5496,177 @@
     programarAutoguardadoFicha();
   }
 
-  function acmIaSeleccionarTodas(flag) {
-    // "Deseleccionar todas" siempre vale para todas las filas. "Seleccionar
-    // todas" nunca marca un candidato sin fuente verificable — si quedó
-    // alguno así guardado de antes de este filtro, el usuario tendría que
-    // marcarlo a mano, a sabiendas de que no se pudo comprobar.
-    let omitidos = 0;
-    acmIaCandidatos.forEach(c => {
-      if (flag && !acmIaTieneLinkReal(c)) { omitidos++; return; }
-      c._selected = flag;
-    });
+  function acmIaMarcarVigente(idx, checked) {
+    const c = acmIaCandidatos[idx];
+    if (!c) return;
+    if (checked && !(c.precio_original > 0 || c.precio > 0)) { showToast('Primero completa el precio del aviso.'); renderAcmIaTabla(); return; }
+    if (checked && !(c.area_techada > 0)) { showToast('Primero completa el área techada del aviso.'); renderAcmIaTabla(); return; }
+    c._vigente = checked;
+    c._vigente_fecha = checked ? new Date().toLocaleDateString('es-PE') : null;
+    if (checked) c._selected = true;
     renderAcmIaTabla();
-    if (flag && omitidos > 0) {
-      showToast('No se marcaron ' + omitidos + ' candidato(s) sin fuente verificable — revísalos manualmente si quieres usarlos.');
-    }
     programarAutoguardadoFicha();
   }
 
-  // Calcula el valor comercial a partir de los candidatos SELECCIONADOS
-  // (sección 7-11 del criterio del usuario): área equivalente, S//m²
-  // ponderado por similitud, % de negociación esperado, nivel de confianza
-  // y una advertencia si hay pocos comparables o alguno atípico entre los
-  // elegidos. Nunca vuelve a llamar a la IA — todo esto es instantáneo.
-  function calcularValorComercialIA() {
+  function acmIaEditar(idx, campo, valor) {
+    const c = acmIaCandidatos[idx];
+    if (!c) return;
+    if (campo === 'moneda') {
+      // Lo guardado antes de la v2 viene en soles: al elegir moneda, el
+      // precio que había pasa a ser el precio original en soles.
+      if (!(c.precio_original > 0) && c.precio > 0) c.precio_original = c.precio;
+      c.moneda = valor === 'PEN' ? 'PEN' : 'USD';
+    } else {
+      const n = parseNum(valor);
+      c[campo] = n > 0 || (campo === 'estacionamientos' && String(valor).trim() !== '') ? n : null;
+      if (campo === 'precio_original' && !c.moneda) c.moneda = acmIaMonedaVista(c);
+    }
+    // Cambiar un dato después de verificar obliga a confirmar de nuevo.
+    if (c._vigente && campo !== 'estacionamientos') { c._vigente = false; c._vigente_fecha = null; }
+    renderAcmIaTabla();
+    programarAutoguardadoFicha();
+  }
+
+  function acmIaSeleccionarTodas(flag) {
+    // "Seleccionar todas" nunca marca un ❌ (link que no es de un aviso real).
+    let omitidos = 0;
+    acmIaCandidatos.forEach(c => {
+      if (flag && acmIaEstado(c).nivel === 'malo') { omitidos++; return; }
+      c._selected = flag;
+    });
+    renderAcmIaTabla();
+    if (flag && omitidos > 0) showToast('No se marcaron ' + omitidos + ' candidato(s) ❌ — no sirven como comparable.');
+    programarAutoguardadoFicha();
+  }
+
+  // Cálculo de perito (v2):
+  //  1) Solo ✅ seleccionados con precio y área.
+  //  2) S//m² equivalente (con ajuste de cochera si se indicó su valor).
+  //  3) Se sacan los extremos (±20% de la mediana) y se usa la MEDIANA.
+  //  4) Mínimo ACM_MIN_COMPARABLES; si no, "NO CONFIABLE" y no se ofrece precio.
+  //  5) Tres valores: de aviso, de cierre probable y conservador (percentil 25).
+  //  6) Contraste con la tasación (si se ingresó) y aviso de dispersión.
+  function calcularValorComercialIA(opts) {
+    const silencioso = !!(opts && opts.silencioso);
     const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
     const descuentoPct = parseNum(document.getElementById('acmIaDescuentoNegociacion').value) || 0;
     const resultadoEl = document.getElementById('acmIaResultado');
+    const filas = acmIaCalcularFilas();
+    const pendientes = filas.filter(c => c._estado.nivel === 'manual').length;
+    const elegibles = filas.filter(c => c._selected && c._estado.nivel === 'ok' && c._pm2Equiv != null);
 
-    const seleccionadosConTodo = acmIaCandidatos.filter(c => c._selected);
-    // Un candidato sin fuente/link verificable NUNCA entra al cálculo,
-    // aunque esté marcado — esto es lo que falló en producción: la IA puso
-    // candidatos inventados en la lista y el usuario (razonablemente) confió
-    // en el número final. Mejor calcular con menos datos que con datos falsos.
-    const descartadosSinFuente = seleccionadosConTodo.filter(c => !acmIaTieneLinkReal(c)).length;
-    const seleccionados = seleccionadosConTodo
-      .filter(c => acmIaTieneLinkReal(c))
-      .map(c => {
-        const areaEquiv = acmIaAreaEquivalente(c, coefPct);
-        const pm2Equiv = (areaEquiv > 0 && c.precio > 0) ? c.precio / areaEquiv : null;
-        return { ...c, _areaEquiv: areaEquiv, _pm2Equiv: pm2Equiv };
-      })
-      .filter(c => c._pm2Equiv != null);
-
-    if (!seleccionados.length) {
-      resultadoEl.innerHTML = '<div class="acm-warning">Selecciona al menos un candidato con precio, área y fuente verificable para poder calcular.' +
-        (descartadosSinFuente ? ' (Había ' + descartadosSinFuente + ' seleccionado(s) sin fuente verificable — no cuentan.)' : '') + '</div>';
-      return;
-    }
     const metrajeInmueble = parseNum(document.getElementById('metraje').value);
     if (!(metrajeInmueble > 0)) {
       resultadoEl.innerHTML = '<div class="acm-warning">Completa el metraje del inmueble (arriba) para calcular su valor comercial.</div>';
       return;
     }
-    // El área equivalente del inmueble a evaluar se calcula con la MISMA
-    // fórmula que a los candidatos (área techada = metraje, + el % del área
-    // sin techar que se haya indicado) — así la comparación es consistente
-    // en ambos lados. Si no se completó el área ocupada, el área equivalente
-    // es simplemente el metraje, igual que antes de este cambio.
     const areaOcupadaInmuebleVal = parseNum(document.getElementById('areaOcupadaInmueble').value) || null;
     const areaEquivInmueble = acmIaAreaEquivalente({ area_techada: metrajeInmueble, area_ocupada: areaOcupadaInmuebleVal }, coefPct) || metrajeInmueble;
 
-    // Promedio ponderado del S//m² equivalente: cada candidato pesa según
-    // su similitud (alto/medio/bajo), así uno "alto" influye más que uno
-    // "bajo" sin descartarlo del todo.
-    let sumaPonderada = 0, sumaPesos = 0;
-    seleccionados.forEach(c => {
-      const peso = ACM_IA_PESO_SIMILITUD[c.similitud] || 0.5;
-      sumaPonderada += c._pm2Equiv * peso;
-      sumaPesos += peso;
-    });
-    const pm2Ponderado = sumaPonderada / sumaPesos;
+    const med0 = acmMediana(elegibles.map(c => c._pm2Equiv));
+    const usados = elegibles.filter(c => Math.abs(c._pm2Equiv / med0 - 1) <= ACM_EXTREMO);
+    const extremos = elegibles.length - usados.length;
+    const faltaTc = acmIaCandidatos.some(c => c.moneda === 'USD' && c.precio_original > 0) && !(acmIaTipoCambio() > 0);
 
-    const pm2Valores = seleccionados.map(c => c._pm2Equiv);
-    const pm2Min = Math.min(...pm2Valores), pm2Max = Math.max(...pm2Valores);
-    const promedioSimple = pm2Valores.reduce((a, b) => a + b, 0) / pm2Valores.length;
-    const desviacion = Math.sqrt(pm2Valores.reduce((a, b) => a + Math.pow(b - promedioSimple, 2), 0) / pm2Valores.length);
-    const coefVariacion = promedioSimple > 0 ? desviacion / promedioSimple : 1;
+    if (usados.length < ACM_MIN_COMPARABLES) {
+      acmIaUltimoResultado = null;
+      resultadoEl.innerHTML =
+        '<div class="acm-ia-noconfiable"><b>⛔ ACM NO CONFIABLE</b> — hay ' + usados.length + ' comparable(s) ✅ válidos y se necesitan al menos ' + ACM_MIN_COMPARABLES + '.' +
+        '<div style="margin-top:6px;">No se sugiere precio para no tomar una decisión con datos insuficientes. Para completar:</div>' +
+        '<ul style="margin:4px 0 0 18px;">' +
+          (pendientes ? '<li>Verifica los ' + pendientes + ' ⚠️: ábrelos, revisa precio y m² y marca "Vigente".</li>' : '') +
+          '<li>Pega más links de avisos parecidos (cuadro "Pegar links").</li>' +
+          (extremos ? '<li>' + extremos + ' comparable(s) quedaron fuera por estar a más de ±20% del resto.</li>' : '') +
+          (faltaTc ? '<li>Ingresa el tipo de cambio.</li>' : '') +
+        '</ul></div>';
+      if (!silencioso) programarAutoguardadoFicha();
+      return;
+    }
 
-    const valorComercial = pm2Ponderado * areaEquivInmueble;
-    const valorCierreEstimado = valorComercial * (1 - descuentoPct / 100);
-    const valorVentaRapida = valorCierreEstimado * 0.95;
+    const pm2 = usados.map(c => c._pm2Equiv);
+    const mediana = acmMediana(pm2);
+    const p25 = acmPercentil(pm2, 0.25);
+    const promedio = pm2.reduce((a, b) => a + b, 0) / pm2.length;
+    const cv = Math.sqrt(pm2.reduce((a, b) => a + Math.pow(b - promedio, 2), 0) / pm2.length) / promedio;
+    const valorAviso = mediana * areaEquivInmueble;
+    const valorCierre = valorAviso * (1 - descuentoPct / 100);
+    const valorConservador = p25 * areaEquivInmueble * (1 - descuentoPct / 100);
+    const confianza = (usados.length >= 8 && cv < 0.10) ? 'alto' : (cv <= ACM_DISPERSION_ALERTA ? 'medio' : 'bajo');
 
-    let confianza = 'bajo';
-    if (seleccionados.length >= 6 && coefVariacion < 0.15) confianza = 'alto';
-    else if (seleccionados.length >= 3 && coefVariacion < 0.30) confianza = 'medio';
+    const avisos = [];
+    if (extremos) avisos.push(extremos + ' comparable(s) excluido(s) por estar a más de ±20% de la mediana.');
+    if (cv > ACM_DISPERSION_ALERTA) avisos.push('Los precios por m² varían mucho entre sí (' + Math.round(cv * 100) + '%): la muestra es poco homogénea.');
+    if (faltaTc) avisos.push('Falta el tipo de cambio: los avisos en dólares no se están contando.');
+    const tasValor = parseNum(document.getElementById('tasacionValor').value);
+    const tasFecha = document.getElementById('tasacionFecha').value;
+    let tasHtml = '';
+    if (tasValor > 0) {
+      const dif = valorCierre / tasValor - 1;
+      let meses = null;
+      if (tasFecha) meses = Math.floor((Date.now() - Date.parse(tasFecha + 'T12:00:00')) / (30.44 * 86400000));
+      tasHtml = '<div style="margin-top:6px;">Tasación' + (tasFecha ? ' del ' + new Date(tasFecha + 'T12:00:00').toLocaleDateString('es-PE') : '') + ': <b>' + fmt(tasValor) + '</b> → el cierre probable está ' +
+        (dif >= 0 ? '+' : '') + (dif * 100).toFixed(1) + '% respecto a la tasación.</div>';
+      if (Math.abs(dif) > ACM_TASACION_ALERTA) avisos.push('El ACM se aleja más de ±15% de la tasación: revisa los comparables o la vigencia de la tasación.');
+      if (meses != null && meses > 12) avisos.push('La tasación tiene ' + meses + ' meses: el mercado pudo moverse desde entonces.');
+    }
 
-    const pm2Ordenados = [...pm2Valores].sort((a, b) => a - b);
-    const midSel = Math.floor(pm2Ordenados.length / 2);
-    const medianaSel = pm2Ordenados.length % 2 !== 0 ? pm2Ordenados[midSel] : (pm2Ordenados[midSel - 1] + pm2Ordenados[midSel]) / 2;
-    const hayAtipicosEntreSeleccionados = seleccionados.some(c => c._pm2Equiv > medianaSel * 1.4 || c._pm2Equiv < medianaSel * 0.6);
-
-    const advertenciaPocos = seleccionados.length < 3
-      ? '<div class="acm-warning">⚠ Con menos de 3 comparables seleccionados, este valor es menos confiable.</div>' : '';
-    const advertenciaAtipicos = hayAtipicosEntreSeleccionados
-      ? '<div class="acm-warning">⚠ Hay comparables seleccionados con un S//m² muy distinto al resto — revísalos antes de confiar en este resultado.</div>' : '';
-    const advertenciaSinFuente = descartadosSinFuente
-      ? '<div class="acm-warning">⚠ Se excluyeron ' + descartadosSinFuente + ' candidato(s) marcado(s) por no tener una fuente verificable — no se usaron en este cálculo.</div>' : '';
+    acmIaUltimoResultado = {
+      version: ACM_VERSION, fecha: new Date().toISOString().slice(0, 10), comparables: usados.length,
+      mediana_m2: Math.round(mediana), valor_aviso: Math.round(valorAviso), valor_cierre: Math.round(valorCierre),
+      valor_conservador: Math.round(valorConservador), descuento: descuentoPct, tipo_cambio: acmIaTipoCambio() || null,
+      tasacion_valor: tasValor || null, tasacion_fecha: tasFecha || null,
+    };
 
     resultadoEl.innerHTML =
-      advertenciaPocos + advertenciaAtipicos + advertenciaSinFuente +
+      avisos.map(a => '<div class="acm-warning">⚠ ' + acmEsc(a) + '</div>').join('') +
       '<div class="acm-ia-valor-box">' +
-        '<div>S//m² equivalente ponderado: <b>' + fmt(pm2Ponderado) + '</b> (rango ' + fmt(pm2Min) + ' – ' + fmt(pm2Max) + ', de ' + seleccionados.length + ' comparable(s) seleccionado(s))' +
+        '<div>S//m² equivalente (mediana): <b>' + fmt(mediana) + '</b> (rango ' + fmt(Math.min(...pm2)) + ' – ' + fmt(Math.max(...pm2)) + ', ' + usados.length + ' comparables ✅)' +
         '<span class="acm-ia-confianza ' + confianza + '">Confianza: ' + confianza + '</span></div>' +
-        '<div style="margin-top:6px;">Valor comercial estimado (' + areaEquivInmueble.toFixed(1) + ' m² equivalentes × S//m² ponderado): <b class="price">' + fmt(valorComercial) + '</b></div>' +
-        '<div>Precio de cierre estimado (−' + descuentoPct + '% de negociación): <b class="price">' + fmt(valorCierreEstimado) + '</b></div>' +
-        '<div>Venta rápida estimada (−5% adicional, orientativo): <b class="price">' + fmt(valorVentaRapida) + '</b></div>' +
-        '<div style="margin-top:8px;"><button class="btn-small" onclick="usarValorComercialAcmIA(' + valorCierreEstimado + ',' + seleccionados.length + ')">Usar precio de cierre estimado →</button></div>' +
+        '<div style="margin-top:6px;">Valor de aviso (' + areaEquivInmueble.toFixed(1) + ' m² × mediana): <b class="price">' + fmt(valorAviso) + '</b></div>' +
+        '<div>Cierre probable (−' + descuentoPct + '% de negociación): <b class="price">' + fmt(valorCierre) + '</b></div>' +
+        '<div>Valor conservador para comprar (percentil 25, −' + descuentoPct + '%): <b class="price">' + fmt(valorConservador) + '</b></div>' +
+        tasHtml +
+        '<div style="margin-top:8px;">' +
+          '<button class="btn-small" onclick="usarValorComercialAcmIA(' + valorCierre + ',' + usados.length + ',\'cierre probable\')">Usar cierre probable →</button> ' +
+          '<button class="btn-small" onclick="usarValorComercialAcmIA(' + valorConservador + ',' + usados.length + ',\'valor conservador\')">Usar valor conservador →</button>' +
+        '</div>' +
       '</div>';
-    programarAutoguardadoFicha();
+    if (!silencioso) programarAutoguardadoFicha();
   }
 
-  function usarValorComercialAcmIA(valor, cantidad) {
+  function usarValorComercialAcmIA(valor, cantidad, etiqueta) {
     document.getElementById('precioVenta').value = formatAmt(valor);
     updateAll();
     const note = document.getElementById('row-acmSourceNote');
     const noteText = document.getElementById('acmSourceNoteText');
     if (note && noteText) {
       const today = new Date().toLocaleDateString('es-PE');
-      noteText.textContent = 'Precio tomado del ACM con IA el ' + today + ' (valor comercial ponderado de ' + cantidad + ' comparable(s) seleccionado(s)).';
+      noteText.textContent = 'Precio tomado del ACM v' + ACM_VERSION + ' el ' + today + ' (' + (etiqueta || 'cierre probable') + ', mediana de ' + cantidad + ' comparables verificados).';
       note.style.display = '';
     }
-    showToast('Precio de venta actualizado desde el ACM con IA ✓');
+    showToast('Precio de venta actualizado desde el ACM ✓');
+    programarAutoguardadoFicha();
   }
 
-  // Lleva los candidatos marcados a la tabla manual de arriba (reusa
-  // addAcmRow/updateAcm tal cual) — así quien prefiera el resumen simple
-  // (promedio/mediana/mín/máx) de la tabla de siempre también puede usarlo
-  // con los candidatos que la IA encontró, sin que un sistema reemplace al
-  // otro.
+  // Lleva los comparables ✅ seleccionados a la tabla manual de arriba (reusa
+  // addAcmRow/updateAcm tal cual), con el precio ya en soles.
   function agregarSeleccionadosATablaAcm() {
-    const coefPct = parseNum(document.getElementById('acmIaCoefSinTechar').value) || 0;
-    const seleccionadosConTodo = acmIaCandidatos.filter(c => c._selected);
-    // Igual que en el cálculo: nunca se pasa a la tabla manual un candidato
-    // sin fuente verificable, aunque esté marcado.
-    const descartadosSinFuente = seleccionadosConTodo.filter(c => !acmIaTieneLinkReal(c)).length;
-    const seleccionados = seleccionadosConTodo.filter(c => acmIaTieneLinkReal(c));
-    if (!seleccionados.length) {
-      showToast(descartadosSinFuente
-        ? 'No se agregó nada: los candidatos seleccionados no tienen fuente verificable.'
-        : 'No hay candidatos seleccionados para agregar.');
+    const filas = acmIaCalcularFilas().filter(c => c._selected);
+    const validos = filas.filter(c => c._estado.nivel === 'ok' && c._precioS > 0);
+    const omitidos = filas.length - validos.length;
+    if (!validos.length) {
+      showToast(omitidos ? 'No se agregó nada: solo se pasan comparables ✅ con precio.' : 'No hay candidatos seleccionados para agregar.');
       return;
     }
-    seleccionados.forEach(c => {
-      const areaEquiv = acmIaAreaEquivalente(c, coefPct);
+    validos.forEach(c => {
       addAcmRow({
         direccion: c.direccion,
-        m2: areaEquiv != null ? Math.round(areaEquiv * 10) / 10 : (c.area_techada ?? ''),
-        precio: c.precio,
+        m2: c._areaEquiv != null ? Math.round(c._areaEquiv * 10) / 10 : (c.area_techada ?? ''),
+        precio: Math.round(c._precioS),
         fuente: c.link || c.fuente,
       });
     });
-    showToast(seleccionados.length + ' candidato(s) agregado(s) a la tabla de comparables de arriba.' +
-      (descartadosSinFuente ? ' (' + descartadosSinFuente + ' no se agregaron por no tener fuente verificable.)' : ''));
+    showToast(validos.length + ' comparable(s) agregado(s) a la tabla de arriba.' + (omitidos ? ' (' + omitidos + ' no se agregaron por no estar ✅.)' : ''));
   }
 
   function addAcmRow(data) {
@@ -5562,11 +5831,15 @@
     document.getElementById('row-acmSourceNote').style.display = 'none';
     acmIaCandidatos = [];
     acmIaNotaTexto = '';
+    acmIaDescartados = [];
+    acmIaTipoCambioInfo = null;
+    acmIaUltimoResultado = null;
     document.getElementById('acmIaPanel').style.display = 'none';
     document.getElementById('acmIaRows').innerHTML = '';
     document.getElementById('acmIaResultado').innerHTML = '';
     document.getElementById('acmIaCoefSinTechar').value = '50';
     document.getElementById('acmIaDescuentoNegociacion').value = '6';
+    ['acmIaTipoCambio', 'acmIaValorCochera', 'acmLinksPegados', 'tasacionFecha', 'tasacionValor'].forEach(id => { document.getElementById(id).value = ''; });
     seedDefaults();
     addPhotoCard(); addPhotoCard(); addPhotoCard();
   }
@@ -5627,18 +5900,32 @@
     // Candidatos de la última búsqueda con IA (y la selección que el
     // usuario había marcado) — se restauran y se vuelven a dibujar, pero
     // SIN volver a llamar a la IA: el cálculo es instantáneo y gratis.
+    // Tasación de referencia (solo fecha y valor comercial).
+    document.getElementById('tasacionFecha').value = record.tasacion_fecha || '';
+    document.getElementById('tasacionValor').value = !isEmpty(record.tasacion_valor_comercial) ? formatAmt(record.tasacion_valor_comercial) : '';
     const acmIa = record.acm_ia_candidatos;
     document.getElementById('acmIaResultado').innerHTML = '';
-    if (acmIa && Array.isArray(acmIa.candidatos) && acmIa.candidatos.length) {
-      acmIaCandidatos = acmIa.candidatos;
+    acmIaUltimoResultado = (acmIa && acmIa.resultado) || null;
+    if (acmIa && ((Array.isArray(acmIa.candidatos) && acmIa.candidatos.length) || (Array.isArray(acmIa.descartados) && acmIa.descartados.length))) {
+      acmIaCandidatos = acmIa.candidatos || [];
       acmIaNotaTexto = acmIa.nota || '';
+      acmIaDescartados = acmIa.descartados || [];
+      acmIaTipoCambioInfo = acmIa.tipo_cambio_info || null;
       document.getElementById('acmIaCoefSinTechar').value = !isEmpty(acmIa.coef_sin_techar) ? acmIa.coef_sin_techar : 50;
       document.getElementById('acmIaDescuentoNegociacion').value = !isEmpty(acmIa.descuento_negociacion) ? acmIa.descuento_negociacion : 6;
+      // Fichas de antes de la v2 no tienen tipo de cambio guardado: queda
+      // vacío (sus precios ya estaban en soles) y nada se recalcula solo.
+      document.getElementById('acmIaTipoCambio').value = !isEmpty(acmIa.tipo_cambio) ? acmIa.tipo_cambio : '';
+      document.getElementById('acmIaValorCochera').value = !isEmpty(acmIa.valor_cochera) ? formatAmt(acmIa.valor_cochera) : '';
       document.getElementById('acmIaPanel').style.display = '';
       renderAcmIaTabla();
     } else {
       acmIaCandidatos = [];
       acmIaNotaTexto = '';
+      acmIaDescartados = [];
+      acmIaTipoCambioInfo = null;
+      document.getElementById('acmIaTipoCambio').value = '';
+      document.getElementById('acmIaValorCochera').value = '';
       document.getElementById('acmIaPanel').style.display = 'none';
       document.getElementById('acmIaRows').innerHTML = '';
     }
@@ -5832,12 +6119,22 @@
       // reabrir la ficha se ve exactamente lo mismo, sin repetir la
       // búsqueda. Si nunca se buscó (o se limpió el formulario), se guarda
       // null en vez de un arreglo vacío.
-      acm_ia_candidatos: acmIaCandidatos.length ? {
+      acm_ia_candidatos: (acmIaCandidatos.length || acmIaDescartados.length) ? {
+        version: ACM_VERSION,
         candidatos: acmIaCandidatos,
+        descartados: acmIaDescartados,
         nota: acmIaNotaTexto,
         coef_sin_techar: parseNum(document.getElementById('acmIaCoefSinTechar').value) || 50,
         descuento_negociacion: parseNum(document.getElementById('acmIaDescuentoNegociacion').value) || 6,
-      } : null
+        tipo_cambio: parseNum(document.getElementById('acmIaTipoCambio').value) || null,
+        tipo_cambio_info: acmIaTipoCambioInfo,
+        valor_cochera: parseNum(document.getElementById('acmIaValorCochera').value) || null,
+        // Foto del último cálculo (fecha, comparables, valores) — queda como
+        // registro aunque después cambien los avisos.
+        resultado: acmIaUltimoResultado,
+      } : null,
+      tasacion_fecha: document.getElementById('tasacionFecha').value || null,
+      tasacion_valor_comercial: parseNum(document.getElementById('tasacionValor').value) || null
     };
     if (!manual && esNueva && !fichaRecordTieneContenido(record)) return;
     fichaGuardando = true;
