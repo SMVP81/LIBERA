@@ -3,6 +3,41 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>
+  // Receptor del botón "➕ Enviar al ACM": el botón abre esta página un segundo con
+  // el aviso en "#acm-recibir=..." (después del #, así no viaja a ningún servidor).
+  // Se guarda en este navegador para que la ficha lo muestre en "Avisos enviados",
+  // se detiene la carga del resto de la app y la ventanita se cierra sola.
+  (function () {
+    var h = location.hash;
+    if (h.indexOf('#acm-recibir=') !== 0) return;
+    try { window.opener = null; } catch (e) {}
+    var ok = false, n = 0;
+    try {
+      var d = JSON.parse(decodeURIComponent(h.slice(13)));
+      if (d && d.libera_acm === 1 && Array.isArray(d.avisos)) {
+        var CLAVE = 'libera_acm_enviados', lista = [];
+        try { lista = JSON.parse(localStorage.getItem(CLAVE) || '[]'); } catch (e) { lista = []; }
+        if (!Array.isArray(lista)) lista = [];
+        var limite = Date.now() - 3 * 86400000; // lo enviado hace más de 3 días se descarta
+        var clave = function (l) { try { var u = new URL(l); return u.hostname.replace(/^www\./, '') + ':' + ((u.pathname.match(/-(\d{3,})(?:\.html)?\/?$/) || [])[1] || u.pathname); } catch (e) { return String(l); } };
+        var m = {};
+        lista.concat(d.avisos.slice(0, 5)).forEach(function (a) {
+          if (!a || typeof a.link !== 'string' || !/^https?:\/\//.test(a.link) || !(Date.parse(a.fecha || 0) >= limite)) return;
+          m[clave(a.link)] = a;
+        });
+        var out = Object.keys(m).map(function (k) { return m[k]; }).slice(-60);
+        localStorage.setItem(CLAVE, JSON.stringify(out));
+        ok = true; n = out.length;
+      }
+    } catch (e) { ok = false; }
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    try { window.stop(); } catch (e) {}
+    document.documentElement.innerHTML = '<head><meta charset="utf-8"><title>LIBERA</title></head><body style="margin:0;font:15px/1.5 Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:' + (ok ? '#146C43' : '#8a1212') + ';color:#fff;text-align:center;padding:16px;box-sizing:border-box">' +
+      (ok ? '✓ Aviso enviado a LIBERA<br><small>' + n + ' aviso(s) en espera en el ACM</small>' : 'No se pudo recibir el aviso. Vuelve a apretar el botón.') + '</body>';
+    setTimeout(function () { window.close(); }, ok ? 900 : 5000);
+  })();
+</script>
 <title>LIBERA · App de Fichas</title>
 
 <!-- "Agregar a pantalla de inicio": con esto el ícono y el nombre que se ven
@@ -365,8 +400,6 @@
   .acm-subject-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
   .acm-subject-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 9.5px; color: #5A6B80; text-transform: uppercase; letter-spacing: 0.3px; }
   .acm-subject-grid input, .acm-subject-grid select { font-size: 11px; padding: 4px 6px; border: 1px solid #C7CFDA; border-radius: 4px; font-family: Arial, sans-serif; width: 110px; text-transform: none; letter-spacing: normal; }
-  #btnBuscarAcmIA { margin-left: 6px; }
-  #btnBuscarAcmIA:disabled { opacity: 0.6; cursor: wait; }
   .acm-ia-panel { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #C7CFDA; }
   .acm-ia-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; font-size: 11px; }
   .acm-ia-count { font-size: 11px; color: #33465e; font-weight: bold; }
@@ -419,10 +452,12 @@
   .acm-radio-label { font-size: 10.5px; color: #33465e; margin: 0 6px; }
   .acm-portales { font-size: 10.5px; color: #33465e; margin-top: 8px; }
   .acm-portal-box { margin-top: 10px; padding: 8px 10px; background: #EEF6F0; border: 1px solid #BFDCC8; border-radius: 7px; }
+  .acm-enviados { margin-top: 8px; padding: 8px 10px; background: #fff; border: 1px dashed #9CC9AA; border-radius: 6px; }
+  .acm-enviados-resumen { font-size: 11px; font-weight: bold; color: #146C43; margin-bottom: 4px; }
+  .acm-enviados-lista { font-size: 10.5px; color: #33465e; margin-bottom: 6px; }
+  .acm-enviados-lista div { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid #EEF2F6; }
+  .acm-enviados-lista button { border: 0; background: none; color: #8a1212; cursor: pointer; font-size: 12px; padding: 0 4px; }
   .acm-marcador { display: inline-block; margin-left: 4px; padding: 3px 10px; border-radius: 6px; background: #146C43; color: #fff !important; font-weight: bold; text-decoration: none; cursor: grab; }
-  .acm-pegar-aviso { margin-top: 8px; font-size: 10.5px; }
-  .acm-pegar-aviso summary { cursor: pointer; font-weight: bold; color: #1b3a5e; }
-  .acm-pegar-aviso input, .acm-pegar-aviso textarea { width: 100%; box-sizing: border-box; font-size: 10.5px; margin: 5px 0; font-family: inherit; }
   .acm-ia-lectura { display: block; font-size: 8.5px; color: #1b3a5e; cursor: help; text-decoration: underline dotted; }
   .acm-radio-label select { font-size: 10.5px; }
   .docs-list-header { display: flex; gap: 8px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; color: #8a95a3; padding: 0 10px; margin-top: 8px; }
@@ -871,7 +906,7 @@
 
           <div class="acm-subject-fields">
             <div class="acm-subject-title">Características del inmueble a evaluar (opcional)</div>
-            <div class="acm-hint">Mientras más completes, más preciso es el área equivalente y más parecidos son los candidatos que encuentra la IA (busca con los mismos dormitorios/baños/antigüedad, no solo el mismo metraje).</div>
+            <div class="acm-hint">Mientras más completes, más preciso es el área equivalente y mejor se filtran los comparables (dormitorios, tamaño y cocheras).</div>
             <div class="acm-subject-grid">
               <label>Área ocupada (m²)<input type="text" id="areaOcupadaInmueble" placeholder="Igual al metraje si no hay área libre" oninput="updateAcm()" /></label>
               <label>Dormitorios<input type="text" id="dormitoriosInmueble" placeholder="3" oninput="updateAcm()" /></label>
@@ -894,15 +929,6 @@
             </div>
           </div>
 
-          <div class="acm-table-wrap">
-            <table class="acm-table">
-              <thead>
-                <tr><th>Dirección / Zona</th><th>m²</th><th>Precio (S/)</th><th>Precio/m²</th><th>Fuente</th><th></th></tr>
-              </thead>
-              <tbody id="acmRows"></tbody>
-            </table>
-          </div>
-          <button class="btn-small" onclick="addAcmRow()">+ Agregar comparable</button>
           <button class="btn-small acm-btn-principal" id="btnBuscarAcmCercanos" onclick="buscarCercanosAcm()" title="Avisos vigentes de Babilonia alrededor de la dirección del inmueble, ya verificados y con su distancia">📍 Buscar comparables cercanos (Babilonia · gratis)</button>
           <label class="acm-radio-label">Radio máximo:
             <select id="acmRadioMax" onchange="renderAcmIaTabla(); programarAutoguardadoFicha()">
@@ -912,9 +938,7 @@
               <option value="1500">1.5 km</option>
             </select>
           </label>
-          <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar también con IA (Urbania/Adondevivir · con costo)</button>
           <div class="acm-ia-hint" id="acmSujetoInfo"></div>
-          <div class="acm-ia-hint">Usa la dirección (o el link de Google Maps de la ficha, si lo pegaste), el metraje y los dormitorios de arriba. La búsqueda con IA tiene un costo pequeño (API de Anthropic); la de cercanos y los avisos que envías desde los portales son gratis.</div>
           <div class="acm-links-box no-print">
             <div class="acm-portales" style="margin-top:0;">Buscar en los portales (se abren con el distrito de la ficha):
               <button class="btn-small" onclick="abrirPortalAcm('urbania')">🔗 Urbania</button>
@@ -927,27 +951,18 @@
               <div class="acm-hint"><b>Una sola vez:</b> arrastra este botón a tu barra de marcadores (si no la ves, presiona Ctrl+Shift+B) →
                 <a id="acmMarcador" class="acm-marcador" href="#" draggable="true" onclick="event.preventDefault(); showToast('No lo hagas clic aquí: arrástralo a tu barra de marcadores. Luego úsalo en la página de un aviso de Urbania, Adondevivir o Babilonia.')">➕ Enviar al ACM</a>
                 <br>Si ya lo tenías, bórralo de tu barra y arrastra este de nuevo (cambió).</div>
-              <div class="acm-hint"><b>Cada vez:</b> 1) Abre el portal con los botones de arriba. 2) Entra a un aviso que te sirva y aprieta «➕ Enviar al ACM» en tu barra: se agrega a tu lista con precio, m², dormitorios, cocheras, antigüedad y dirección. 3) Repite con todos los avisos que quieras. 4) Al terminar, vuelve aquí y aprieta:</div>
-              <button class="btn-small" id="btnPegarPortalAcm" onclick="pegarAvisosPortalAcm()">📋 Pegar avisos enviados</button>
-              <div id="acmPortalManual" style="display:none;">
-                <div class="acm-hint">Tu navegador no dejó leer lo copiado. Haz clic en el cuadro, presiona Ctrl+V y luego «Procesar».</div>
-                <textarea id="acmPortalDatos" rows="2" placeholder="Pega aquí (Ctrl+V)"></textarea>
-                <button class="btn-small" onclick="procesarAvisosPortalAcm(document.getElementById('acmPortalDatos').value)">✔ Procesar</button>
+              <div class="acm-hint"><b>Cada vez:</b> abre los portales con los botones de arriba, entra a cada aviso que te sirva y aprieta «➕ Enviar al ACM». Puedes mezclar portales. Cada aviso aparece aquí solo; cuando termines, aprieta «Validar y agregar». La primera vez, si Chrome bloquea la ventanita, elige «Permitir siempre».</div>
+              <div class="acm-enviados" id="acmEnviados">
+                <div class="acm-enviados-resumen" id="acmEnviadosResumen">📥 Aún no hay avisos enviados.</div>
+                <div class="acm-enviados-lista" id="acmEnviadosLista"></div>
+                <button class="btn-small acm-btn-principal" id="btnValidarEnviadosAcm" onclick="validarAvisosEnviadosAcm()" disabled>✔ Validar y agregar al ACM</button>
+                <button class="btn-small" id="btnVaciarEnviadosAcm" onclick="vaciarAvisosEnviadosAcm()" disabled>🗑 Vaciar</button>
               </div>
-              <div class="acm-hint">Recién ahí se validan todos juntos: se descartan solos los de tamaño o dormitorios muy distintos y los que quedan lejos. La primera vez, el navegador puede preguntar si el portal puede ver lo copiado: dale «Permitir» (así se juntan avisos de varios portales). Para empezar otra ficha, aprieta el botón en una página de resultados y elige «Vaciar lista».</div>
             </div>
-            <details class="acm-pegar-aviso">
-              <summary>🧠 Pegar un aviso completo para que la IA lo lea (evita tipear precio y m² · ~1 centavo)</summary>
-              <div class="acm-hint">1) Abre el aviso. 2) Copia su link y pégalo abajo. 3) En la página del aviso presiona Ctrl+A y luego Ctrl+C. 4) Pega el texto abajo y aprieta "Leer aviso". Cada dato que lea la IA trae la frase del aviso de donde salió; lo que no tenga respaldo se borra solo.</div>
-              <input type="text" id="acmAvisoLink" placeholder="Link del aviso (https://urbania.pe/inmueble/clasificado/...)" />
-              <textarea id="acmAvisoTexto" rows="4" placeholder="Pega aquí todo el texto de la página del aviso"></textarea>
-              <button class="btn-small" id="btnLeerAvisoAcm" onclick="leerAvisoPegadoAcm()">🧠 Leer aviso</button>
-            </details>
           </div>
-          <div class="acm-summary" id="acmSummary"></div>
 
           <div class="acm-ia-panel no-print" id="acmIaPanel" style="display:none;">
-            <div class="photos-title" style="margin-top:0;">🔎 Comparables (cercanos, IA y avisos enviados)</div>
+            <div class="photos-title" style="margin-top:0;">🔎 Comparables (cercanos y avisos enviados)</div>
             <div class="acm-hint" id="acmIaNota"></div>
             <div class="acm-ia-leyenda">✅ verificado o copiado del portal y cerca · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo) · 📏 solo referencia (tamaño muy distinto). Solo cuentan los ✅.</div>
             <div class="acm-ia-toolbar">
@@ -1000,7 +1015,6 @@
               <ul id="acmIaDescartadosLista"></ul>
             </details>
             <button class="btn-small" id="btnCalcularValorComercial" onclick="calcularValorComercialIA()">📊 Calcular valor comercial</button>
-            <button class="btn-small" onclick="agregarSeleccionadosATablaAcm()">+ Agregar seleccionados a mi tabla de arriba</button>
             <div class="acm-ia-resultado" id="acmIaResultado"></div>
           </div>
         </div>
@@ -5231,58 +5245,6 @@
    * como se trabaja hoy: primero el ACM, luego la Ficha de Rentabilidad.
    * ==================================================================== */
 
-  // Busca candidatos automáticamente con IA (ver Edge Function "acm-search").
-  // No se dispara solo ni se repite: cada clic es una decisión consciente del
-  // usuario, porque cada búsqueda real tiene un costo de uso en la API de
-  // Anthropic (separado de la suscripción a Claude). La IA solo devuelve una
-  // lista CRUDA de candidatos — la selección de cuáles usar y todo el
-  // cálculo (área equivalente, % de negociación, ponderación, etc.) se hace
-  // después, en el navegador, sin volver a llamar a la IA.
-  async function buscarComparablesIA() {
-    const inmueble = {
-      direccion: document.getElementById('direccion').value.trim(),
-      distrito: document.getElementById('distrito').value.trim(),
-      tipo_inmueble: document.getElementById('tipoInmueble').value.trim(),
-      metraje: document.getElementById('metraje').value.trim(),
-      // Características opcionales — si están completas, la IA busca
-      // candidatos más parecidos (mismos dormitorios/baños/antigüedad),
-      // no solo del mismo metraje.
-      area_ocupada: document.getElementById('areaOcupadaInmueble').value.trim(),
-      dormitorios: document.getElementById('dormitoriosInmueble').value.trim(),
-      banos: document.getElementById('banosInmueble').value.trim(),
-      antiguedad: document.getElementById('antiguedadInmueble').value.trim(),
-      piso: document.getElementById('pisoInmueble').value.trim(),
-      ascensor: document.getElementById('ascensorInmueble').value.trim(),
-      estacionamientos: document.getElementById('estacionamientosInmueble').value.trim(),
-      link_ubicacion: document.getElementById('linkUbicacion').value.trim(),
-      radio_max: acmRadioMax(),
-    };
-    if (!inmueble.direccion) {
-      alert('Escribe primero la dirección del inmueble (arriba) para poder buscar comparables.');
-      return;
-    }
-    if (!confirm('Esto va a buscar comparables en la web usando IA. Cada búsqueda tiene un costo pequeño en la API de Anthropic (aparte de tu suscripción a Claude). ¿Continuar?')) {
-      return;
-    }
-    const btn = document.getElementById('btnBuscarAcmIA');
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Buscando…';
-    try {
-      const resultado = await db.buscarComparablesACM(inmueble);
-      if (resultado && resultado.error) {
-        showToast('No se pudo completar la búsqueda: ' + resultado.error);
-        return;
-      }
-      acmIaAplicarRespuesta(resultado, 'ia');
-    } catch (e) {
-      showToast('No se pudo completar la búsqueda: ' + (e && e.message ? e.message : e));
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-    }
-  }
-
   function acmRadioMax() {
     return parseNum(document.getElementById('acmRadioMax').value) || 1000;
   }
@@ -5314,69 +5276,95 @@
     window.open(url, '_blank', 'noopener');
   }
 
-  // Aviso pegado: la IA lee precio, m², etc. del texto que el usuario copió de
-  // la página del aviso. Cada dato debe venir con una frase que exista tal cual
-  // en el texto (lo controla la Edge Function); el usuario igual revisa y marca "Vigente".
-  async function leerAvisoPegadoAcm() {
-    const link = document.getElementById('acmAvisoLink').value.trim();
-    const texto = document.getElementById('acmAvisoTexto').value;
-    const cl = acmClasificarLink(link);
-    if (!cl.ok) { showToast('Pega el link de UN aviso (no una página de resultados): ' + cl.motivo); return; }
-    if (texto.trim().length < 150) { showToast('Falta el texto: en la página del aviso presiona Ctrl+A, luego Ctrl+C, y pégalo aquí.'); return; }
-    const btn = document.getElementById('btnLeerAvisoAcm');
-    const original = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Leyendo…';
-    try {
-      const resultado = await db.leerAvisoPegadoACM(link, texto, acmDatosInmueble());
-      if (resultado && resultado.error) { showToast(resultado.error); return; }
-      const n = acmIaAplicarRespuesta(resultado, 'texto');
-      document.getElementById('acmAvisoLink').value = '';
-      document.getElementById('acmAvisoTexto').value = '';
-      showToast(n ? 'Aviso leído ✓ Revisa los datos y marca "Vigente".' : (((resultado && resultado.descartados) || [])[0] || {}).motivo || 'No se pudo usar ese aviso.');
-    } catch (e) {
-      showToast('No se pudo leer el aviso: ' + (e && e.message ? e.message : e));
-    } finally {
-      btn.disabled = false; btn.textContent = original;
-    }
-  }
-
-  // Botón de la barra de marcadores "➕ Enviar al ACM" (v2, aviso por aviso).
+  // Botón de la barra de marcadores "➕ Enviar al ACM" (v3, envío directo).
   // Corre en la página de UN aviso que el usuario está viendo (Urbania/Adondevivir
-  // bloquean al servidor, no a su navegador), lo lee y lo agrega a una lista que
-  // queda copiada; al terminar se pega aquí y se valida todo junto. Nunca copia
-  // teléfonos ni nombres. El código fuente legible está en acm-v2/marcador.js.
-  const ACM_MARCADOR = "(async()=>{const f=\"libera_acm_lista\",A=e=>String(e||\"\").replace(/\\s+/g,\" \").trim(),p=e=>{if(!e)return null;const t=Number(String(e).replace(/[.,](?=\\d{3}(\\D|$))/g,\"\").replace(\",\",\".\"));return Number.isFinite(t)?t:null},T=e=>{e=String(e||\"\");const t=e.match(/(?:USD|US\\$|U\\$S)\\s?([\\d.,]+)/i),o=e.match(/S\\/\\.?\\s?([\\d.,]+)/);return{usd:t?p(t[1]):null,pen:o?p(o[1]):null}},w=\"(?:m\\xB2|m2|mt2|ha)\",_=e=>{e=String(e||\"\");const t=o=>{const a=e.match(o);return a?p(a[1]):null};return{tot:t(new RegExp(\"([\\\\d.,]+)\\\\s*\"+w+\"\\\\s*tot\",\"i\")),cub:t(new RegExp(\"([\\\\d.,]+)\\\\s*\"+w+\"\\\\s*(?:cub|tech|constr)\",\"i\")),dorm:t(/(\\d+)\\s*dorm/i),banos:t(/(\\d+)\\s*ba\u00f1os?/i),estac:t(/(\\d+)\\s*estac/i),anios:t(/(\\d+)\\s*a\u00f1os/i),estreno:/a estrenar/i.test(e)}},g=e=>{try{const t=new URL(e);return t.hostname.replace(/^www\\./,\"\")+\":\"+((t.pathname.match(/-(\\d{3,})(?:\\.html)?\\/?$/)||[])[1]||t.pathname)}catch{return String(e)}},u=(e,t,o)=>{const a=document.createElement(\"div\");if(a.style.cssText=\"position:fixed;top:16px;right:16px;z-index:2147483647;max-width:360px;padding:12px 16px;border-radius:10px;font:14px/1.4 Arial,sans-serif;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);background:\"+(t?\"#146C43\":\"#8a1212\"),a.textContent=e,o){const i=document.createElement(\"button\");i.textContent=\"Vaciar lista\",i.style.cssText=\"display:block;margin-top:8px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#146C43;font:bold 12px Arial,sans-serif;cursor:pointer\",i.onclick=()=>{try{localStorage.removeItem(f)}catch{}try{navigator.clipboard.writeText(\"\")}catch{}a.textContent=\"LIBERA: lista vac\\xEDa.\",setTimeout(()=>a.remove(),2500)},a.appendChild(i)}document.body.appendChild(a),setTimeout(()=>a.remove(),o?12e3:8e3)};let c=[];try{c=JSON.parse(localStorage.getItem(f)||\"[]\")}catch{c=[]}let R=!1,C=\"\";try{C=await navigator.clipboard.readText()}catch{R=!0}try{const e=JSON.parse(C);e&&e.libera_acm===1&&Array.isArray(e.avisos)&&(c=c.concat(e.avisos))}catch{}const k=Date.now()-12*36e5,l=new Map;for(const e of c)e&&e.link&&Date.parse(e.fecha||0)>=k&&l.set(g(e.link),e);let h=\"lista\";if(/\\/(inmueble|propiedades)\\/clasificado\\/|babilonia\\.pe\\/inmueble\\//.test(location.href)){const e=document.body.innerText,t=e.slice(0,2500),o=[...document.querySelectorAll('script[type=\"application/ld+json\"]')].map(n=>{try{return JSON.parse(n.textContent)}catch{return null}}).find(n=>n&&/Apartment|House|Residence|SingleFamily|RealEstateListing/i.test(JSON.stringify(n[\"@type\"]||\"\"))),a=o&&(o.mainEntity||o)||{},i=(t.match(/(?:Venta|Precio)[^\\n]{0,80}/i)||[\"\"])[0],m=T(i||t),I=[...document.querySelectorAll('li[class*=\"feature\"]')].map(n=>n.innerText).join(`\n`),r=_(I||t),d=a.address||{},v=n=>A(String(n||\"\").replace(/,?\\s*(Lima,\\s*)*Per[u\u00fa].*$/i,\"\")),E=(e.slice(0,8e3).match(/(pre-?venta|en planos|entrega (?:estimada|prevista|en)[^\\n]{0,40}|en construcci[o\u00f3]n)/i)||[])[0],O={link:location.href.split(\"?\")[0].split(\"#\")[0],fecha:new Date().toISOString(),precio_usd:m.usd,precio_pen:m.pen,area_total:r.tot??(a.floorSize?p(a.floorSize.value??a.floorSize):null),area_techada:r.cub,dormitorios:r.dorm??a.numberOfBedrooms??null,banos:r.banos??a.numberOfBathroomsTotal??null,cocheras:r.estac,antiguedad_anios:r.anios,a_estrenar:r.estreno||void 0,alerta:E?A(E).slice(0,60):void 0,direccion:[v(d.streetAddress),v(d.addressRegion||d.addressLocality)].filter(Boolean).join(\", \"),zona:v(d.addressRegion||d.addressLocality)},S=g(O.link);h=l.has(S)?\"repetido\":\"nuevo\",l.delete(S),l.set(S,O)}const s=[...l.values()];try{localStorage.setItem(f,JSON.stringify(s))}catch{}const b=JSON.stringify({libera_acm:1,v:2,fecha:new Date().toISOString(),avisos:s});window.__liberaAcm=b;const x={};for(const e of s){const t=g(e.link).split(\":\")[0].replace(/\\..*$/,\"\");x[t]=(x[t]||0)+1}const y=s.length+\" aviso(s) en la lista\"+(s.length?\" (\"+Object.entries(x).map(([e,t])=>t+\" \"+e).join(\", \")+\")\":\"\")+\".\";if(!await(async()=>{try{return await navigator.clipboard.writeText(b),!0}catch{const t=document.createElement(\"textarea\");t.value=b,document.body.appendChild(t),t.select();let o=!1;try{o=document.execCommand(\"copy\")}catch{o=!1}return t.remove(),o}})()){u(\"LIBERA: el aviso qued\\xF3 en la lista, pero no se pudo copiar. Aprieta el bot\\xF3n otra vez.\",!1);return}const L=R?\" (Tu navegador no deja juntar avisos de distintos portales: si usas varios, pega en el ACM la lista de cada portal por separado.)\":\"\";h===\"nuevo\"?u(\"LIBERA: aviso agregado \\u2713 \"+y+\" Sigue con el pr\\xF3ximo. Al terminar, ve al ACM y aprieta \\xAB\\u{1F4CB} Pegar avisos enviados\\xBB.\"+L,!0):h===\"repetido\"?u(\"LIBERA: ese aviso ya estaba en la lista. \"+y,!0):u(\"LIBERA: aqu\\xED no hay un aviso. Abre UN aviso y aprieta el bot\\xF3n. \"+y,!!s.length,s.length>0)})();";
+  // bloquean al servidor, no a su navegador), lo lee y lo manda a esta app con una
+  // ventanita que se cierra sola (ver el receptor al inicio del archivo). Los avisos
+  // esperan en "Avisos enviados" hasta que se validan. Nunca copia teléfonos ni
+  // nombres. El código fuente legible está en acm-v2/marcador.js.
+  const ACM_MARCADOR = "(()=>{const x=\"__LIBERA_URL__\",u=e=>String(e||\"\").replace(/\\s+/g,\" \").trim(),s=e=>{if(!e)return null;const n=Number(String(e).replace(/[.,](?=\\d{3}(\\D|$))/g,\"\").replace(\",\",\".\"));return Number.isFinite(n)?n:null},_=e=>{e=String(e||\"\");const n=e.match(/(?:USD|US\\$|U\\$S)\\s?([\\d.,]+)/i),t=e.match(/S\\/\\.?\\s?([\\d.,]+)/);return{usd:n?s(n[1]):null,pen:t?s(t[1]):null}},m=\"(?:m\\xB2|m2|mt2|ha)\",v=e=>{e=String(e||\"\");const n=t=>{const h=e.match(t);return h?s(h[1]):null};return{tot:n(new RegExp(\"([\\\\d.,]+)\\\\s*\"+m+\"\\\\s*tot\",\"i\")),cub:n(new RegExp(\"([\\\\d.,]+)\\\\s*\"+m+\"\\\\s*(?:cub|tech|constr)\",\"i\")),dorm:n(/(\\d+)\\s*dorm/i),banos:n(/(\\d+)\\s*ba\u00f1os?/i),estac:n(/(\\d+)\\s*estac/i),anios:n(/(\\d+)\\s*a\u00f1os/i),estreno:/a estrenar/i.test(e)}},c=(e,n)=>{const t=document.createElement(\"div\");t.style.cssText=\"position:fixed;top:16px;right:16px;z-index:2147483647;max-width:360px;padding:12px 16px;border-radius:10px;font:14px/1.4 Arial,sans-serif;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);background:\"+(n?\"#146C43\":\"#8a1212\"),t.textContent=e,document.body.appendChild(t),setTimeout(()=>t.remove(),n?5e3:12e3)};if(!/\\/(inmueble|propiedades)\\/clasificado\\/|babilonia\\.pe\\/inmueble\\//.test(location.href)){c(\"LIBERA: aqu\\xED no hay un aviso. Entra a UN aviso de Urbania, Adondevivir o Babilonia y aprieta el bot\\xF3n.\",!1);return}const b=document.body.innerText,l=b.slice(0,2500),d=[...document.querySelectorAll('script[type=\"application/ld+json\"]')].map(e=>{try{return JSON.parse(e.textContent)}catch{return null}}).find(e=>e&&/Apartment|House|Residence|SingleFamily|RealEstateListing/i.test(JSON.stringify(e[\"@type\"]||\"\"))),i=d&&(d.mainEntity||d)||{},y=(l.match(/(?:Venta|Precio)[^\\n]{0,80}/i)||[\"\"])[0],g=_(y||l),A=[...document.querySelectorAll('li[class*=\"feature\"]')].map(e=>e.innerText).join(`\n`),a=v(A||l),r=i.address||{},p=e=>u(String(e||\"\").replace(/,?\\s*(Lima,\\s*)*Per[u\u00fa].*$/i,\"\")),f=(b.slice(0,8e3).match(/(pre-?venta|en planos|entrega (?:estimada|prevista|en)[^\\n]{0,40}|en construcci[o\u00f3]n)/i)||[])[0],o={link:location.href.split(\"?\")[0].split(\"#\")[0],fecha:new Date().toISOString(),precio_usd:g.usd,precio_pen:g.pen,area_total:a.tot??(i.floorSize?s(i.floorSize.value??i.floorSize):null),area_techada:a.cub,dormitorios:a.dorm??i.numberOfBedrooms??null,banos:a.banos??i.numberOfBathroomsTotal??null,cocheras:a.estac,antiguedad_anios:a.anios,a_estrenar:a.estreno||void 0,alerta:f?u(f).slice(0,60):void 0,direccion:[p(r.streetAddress),p(r.addressRegion||r.addressLocality)].filter(Boolean).join(\", \"),zona:p(r.addressRegion||r.addressLocality)},S=JSON.stringify({libera_acm:1,v:3,avisos:[o]});if(window.__liberaAcm=S,!window.open(x+\"#acm-recibir=\"+encodeURIComponent(S),\"libera_acm_\"+Date.now(),\"width=440,height=200\")){c('LIBERA: Chrome bloque\\xF3 la ventanita. Arriba a la derecha, en la barra de direcciones, aprieta el \\xEDcono de \"ventana emergente bloqueada\", elige \\xABPermitir siempre\\xBB y vuelve a apretar el bot\\xF3n.',!1);return}c(\"LIBERA: aviso enviado al ACM \\u2713 (\"+(o.precio_usd?\"US$ \"+o.precio_usd.toLocaleString(\"en-US\"):o.precio_pen?\"S/ \"+o.precio_pen.toLocaleString(\"en-US\"):\"sin precio\")+\" \\xB7 \"+(o.area_techada||o.area_total||\"?\")+\" m\\xB2). Sigue con el pr\\xF3ximo.\",!0)})();";
   function acmPrepararMarcador() {
     const a = document.getElementById('acmMarcador');
-    if (a) a.setAttribute('href', 'javascript:' + encodeURIComponent(ACM_MARCADOR));
+    // La dirección de esta app (para que el botón sepa a dónde mandar los avisos).
+    const app = location.origin + location.pathname;
+    if (a) a.setAttribute('href', 'javascript:' + encodeURIComponent(ACM_MARCADOR.replace('__LIBERA_URL__', app.replace(/'/g, '%27'))));
   }
-  async function pegarAvisosPortalAcm() {
-    let texto = '';
-    try { if (navigator.clipboard && navigator.clipboard.readText) texto = await navigator.clipboard.readText(); } catch (e) { texto = ''; }
-    if (!texto) { document.getElementById('acmPortalManual').style.display = ''; document.getElementById('acmPortalDatos').focus(); return; }
-    await procesarAvisosPortalAcm(texto);
+
+  // Bandeja "Avisos enviados": lo que mandó el botón, guardado en este navegador.
+  const ACM_CLAVE_ENVIADOS = 'libera_acm_enviados';
+  function acmLeerEnviados() {
+    try { const l = JSON.parse(localStorage.getItem(ACM_CLAVE_ENVIADOS) || '[]'); return Array.isArray(l) ? l.filter(a => a && typeof a.link === 'string') : []; } catch (e) { return []; }
   }
+  function acmGuardarEnviados(lista) {
+    try { if (lista.length) localStorage.setItem(ACM_CLAVE_ENVIADOS, JSON.stringify(lista)); else localStorage.removeItem(ACM_CLAVE_ENVIADOS); } catch (e) {}
+  }
+  function acmPortalDeLink(link) {
+    const c = acmClasificarLink(link);
+    if (c.ok) return c.fuente;
+    try { return new URL(link).hostname.replace(/^www\./, ''); } catch (e) { return 'Link'; }
+  }
+  function renderAcmEnviados() {
+    const resumen = document.getElementById('acmEnviadosResumen');
+    const listaEl = document.getElementById('acmEnviadosLista');
+    if (!resumen || !listaEl) return;
+    const lista = acmLeerEnviados();
+    const porPortal = {};
+    lista.forEach(a => { const p = acmPortalDeLink(a.link); porPortal[p] = (porPortal[p] || 0) + 1; });
+    resumen.textContent = lista.length
+      ? '📥 ' + lista.length + ' aviso(s) enviado(s), sin validar (' + Object.entries(porPortal).map(([p, n]) => n + ' ' + p).join(', ') + ')'
+      : '📥 Aún no hay avisos enviados.';
+    listaEl.innerHTML = lista.map((a, i) => {
+      const precio = a.precio_usd > 0 ? 'US$ ' + Number(a.precio_usd).toLocaleString('en-US') : (a.precio_pen > 0 ? 'S/ ' + Number(a.precio_pen).toLocaleString('en-US') : 'sin precio');
+      const area = a.area_techada || a.area_total;
+      return '<div><span>' + acmEsc(acmPortalDeLink(a.link)) + ' · ' + acmEsc(precio) + ' · ' + (area ? acmEsc(area) + ' m²' : '? m²') + (a.dormitorios != null ? ' · ' + acmEsc(a.dormitorios) + ' dorm.' : '') +
+        (a.direccion ? ' · ' + acmEsc(String(a.direccion).slice(0, 60)) : '') + '</span><button title="Quitar este aviso" onclick="quitarAvisoEnviadoAcm(' + i + ')">✕</button></div>';
+    }).join('');
+    document.getElementById('btnValidarEnviadosAcm').disabled = !lista.length;
+    document.getElementById('btnVaciarEnviadosAcm').disabled = !lista.length;
+  }
+  function quitarAvisoEnviadoAcm(i) {
+    const lista = acmLeerEnviados();
+    lista.splice(i, 1);
+    acmGuardarEnviados(lista);
+    renderAcmEnviados();
+  }
+  function vaciarAvisosEnviadosAcm() {
+    const n = acmLeerEnviados().length;
+    if (n && !confirm('¿Quitar los ' + n + ' aviso(s) enviados sin validar?')) return;
+    acmGuardarEnviados([]);
+    renderAcmEnviados();
+  }
+  async function validarAvisosEnviadosAcm() {
+    const lista = acmLeerEnviados();
+    if (!lista.length) { showToast('Aún no hay avisos enviados.'); return; }
+    const ok = await procesarAvisosPortalAcm(JSON.stringify({ libera_acm: 1, v: 3, avisos: lista.slice(0, 60) }));
+    if (ok) acmGuardarEnviados(acmLeerEnviados().filter(a => !lista.slice(0, 60).some(b => b.link === a.link)));
+    renderAcmEnviados();
+  }
+  // Se actualiza sola cuando llega un aviso (desde la ventanita) o al volver a esta pestaña.
+  window.addEventListener('storage', e => { if (e.key === ACM_CLAVE_ENVIADOS || e.key === null) renderAcmEnviados(); });
+  window.addEventListener('focus', renderAcmEnviados);
   async function procesarAvisosPortalAcm(texto) {
     let d = null;
     try { d = JSON.parse(String(texto || '').trim()); } catch (e) { d = null; }
-    if (!d || d.libera_acm !== 1 || !Array.isArray(d.avisos)) { showToast('Lo copiado no viene del botón «➕ Enviar al ACM». En la página del portal aprieta ese botón y vuelve a intentar.'); return; }
-    if (!d.avisos.length) { showToast('No había avisos en lo copiado.'); return; }
+    if (!d || d.libera_acm !== 1 || !Array.isArray(d.avisos)) { showToast('Esos datos no vienen del botón «➕ Enviar al ACM».'); return false; }
+    if (!d.avisos.length) { showToast('No hay avisos para validar.'); return false; }
     const inmueble = acmDatosInmueble();
-    if (!(parseNum(inmueble.metraje) > 0)) { showToast('Completa primero el metraje del inmueble.'); return; }
-    if (!inmueble.direccion && !inmueble.link_ubicacion) { showToast('Escribe primero la dirección del inmueble.'); return; }
-    const btn = document.getElementById('btnPegarPortalAcm');
+    if (!(parseNum(inmueble.metraje) > 0)) { showToast('Completa primero el metraje del inmueble.'); return false; }
+    if (!inmueble.direccion && !inmueble.link_ubicacion) { showToast('Escribe primero la dirección del inmueble.'); return false; }
+    const btn = document.getElementById('btnValidarEnviadosAcm');
     const original = btn.textContent;
     btn.disabled = true; btn.textContent = 'Procesando ' + d.avisos.length + ' aviso(s)…';
     try {
       const resultado = await db.pegarPortalACM(JSON.stringify(d), inmueble);
-      if (resultado && resultado.error) { showToast(resultado.error); return; }
+      if (resultado && resultado.error) { showToast(resultado.error); return false; }
       const n = acmIaAplicarRespuesta(resultado, 'portal');
-      document.getElementById('acmPortalDatos').value = '';
-      document.getElementById('acmPortalManual').style.display = 'none';
       const nDesc = ((resultado && resultado.descartados) || []).length;
       showToast(n + ' aviso(s) agregado(s) de ' + d.avisos.length + ' enviado(s)' + (nDesc ? ', ' + nDesc + ' descartado(s) (tamaño, dormitorios o distancia: mira el detalle).' : '.'));
+      return true;
     } catch (e) {
       showToast('No se pudieron procesar los avisos: ' + (e && e.message ? e.message : e));
+      return false;
     } finally {
       btn.disabled = false; btn.textContent = original;
     }
@@ -5945,132 +5933,13 @@
     programarAutoguardadoFicha();
   }
 
-  // Lleva los comparables ✅ seleccionados a la tabla manual de arriba (reusa
-  // addAcmRow/updateAcm tal cual), con el precio ya en soles.
-  function agregarSeleccionadosATablaAcm() {
-    const filas = acmIaCalcularFilas().filter(c => c._selected);
-    const validos = filas.filter(c => c._estado.nivel === 'ok' && c._precioS > 0);
-    const omitidos = filas.length - validos.length;
-    if (!validos.length) {
-      showToast(omitidos ? 'No se agregó nada: solo se pasan comparables ✅ con precio.' : 'No hay candidatos seleccionados para agregar.');
-      return;
-    }
-    validos.forEach(c => {
-      addAcmRow({
-        direccion: c.direccion,
-        m2: c._areaEquiv != null ? Math.round(c._areaEquiv * 10) / 10 : (c.area_techada ?? ''),
-        precio: Math.round(c._precioS),
-        fuente: c.link || c.fuente,
-      });
-    });
-    showToast(validos.length + ' comparable(s) agregado(s) a la tabla de arriba.' + (omitidos ? ' (' + omitidos + ' no se agregaron por no estar ✅.)' : ''));
-  }
-
-  function addAcmRow(data) {
-    const tbody = document.getElementById('acmRows');
-    const tr = document.createElement('tr');
-    tr.className = 'acm-row';
-    tr.innerHTML =
-      '<td><input type="text" class="acm-direccion" oninput="updateAcm()" placeholder="Ej. Calle X, a 2 cuadras" /></td>' +
-      '<td><input type="text" class="acm-m2" oninput="updateAcm()" placeholder="90" /></td>' +
-      '<td><input type="text" class="acm-precio" oninput="updateAcm()" placeholder="350,000" /></td>' +
-      '<td class="acm-pm2">—</td>' +
-      '<td><input type="text" class="acm-fuente" placeholder="Link o fuente" /></td>' +
-      '<td><button class="row-remove" onclick="removeAcmRow(this)">×</button></td>';
-    tbody.appendChild(tr);
-    if (data) {
-      tr.querySelector('.acm-direccion').value = data.direccion || '';
-      tr.querySelector('.acm-m2').value = !isEmpty(data.m2) ? data.m2 : '';
-      tr.querySelector('.acm-precio').value = !isEmpty(data.precio) ? formatAmt(data.precio) : '';
-      tr.querySelector('.acm-fuente').value = data.fuente || '';
-    }
-    updateAcm();
-  }
-
-  function removeAcmRow(btn) {
-    const tr = btn.closest('tr');
-    const tieneDatos = tr && Array.from(tr.querySelectorAll('input')).some(inp => (inp.value || '').trim() !== '');
-    if (tieneDatos && !confirm('¿Eliminar este comparable? Se perderán sus datos.')) return;
-    if (tr) tr.remove();
-    updateAcm();
-  }
-
-  function collectAcmRows() {
-    return Array.from(document.querySelectorAll('#acmRows .acm-row'))
-      .map(tr => ({
-        direccion: tr.querySelector('.acm-direccion').value.trim(),
-        m2: parseNum(tr.querySelector('.acm-m2').value) || null,
-        precio: parseNum(tr.querySelector('.acm-precio').value) || null,
-        fuente: tr.querySelector('.acm-fuente').value.trim(),
-      }))
-      .filter(r => r.direccion || r.m2 || r.precio || r.fuente);
-  }
-
+  // La tabla manual del ACM v1 se quitó (oct-2026). Lo que tenían guardado las
+  // fichas antiguas se conserva tal cual al volver a guardarlas.
+  let acmComparablesLegado = [];
+  // Antes recalculaba la tabla manual; ahora refresca la tabla de comparables
+  // (el ajuste por tamaño depende del metraje del inmueble).
   function updateAcm() {
-    const rows = Array.from(document.querySelectorAll('#acmRows .acm-row'));
-    const pm2Values = [];
-    rows.forEach(tr => {
-      const m2 = parseNum(tr.querySelector('.acm-m2').value);
-      const precio = parseNum(tr.querySelector('.acm-precio').value);
-      const pm2El = tr.querySelector('.acm-pm2');
-      if (m2 > 0 && precio > 0) {
-        const pm2 = precio / m2;
-        pm2El.textContent = fmt(pm2);
-        pm2Values.push(pm2);
-      } else {
-        pm2El.textContent = '—';
-      }
-    });
-
-    const summaryEl = document.getElementById('acmSummary');
-    if (!summaryEl) return;
-    if (pm2Values.length === 0) {
-      summaryEl.innerHTML = '<div class="acm-empty">Agrega al menos un comparable con m² y precio para ver el resumen.</div>';
-      return;
-    }
-
-    const avg = pm2Values.reduce((a, b) => a + b, 0) / pm2Values.length;
-    const sorted = [...pm2Values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-    const min = sorted[0], max = sorted[sorted.length - 1];
-
-    const metrajeInmueble = parseNum(document.getElementById('metraje').value);
-    let suggestedHtml;
-    if (metrajeInmueble > 0) {
-      const suggested = avg * metrajeInmueble;
-      suggestedHtml =
-        '<div class="acm-suggested">Precio sugerido (Precio/m² promedio × ' + metrajeInmueble + ' m² del inmueble): ' +
-        '<b class="price">' + fmt(suggested) + '</b> ' +
-        '<button class="btn-small" onclick="usarPrecioAcm(' + suggested + ',' + pm2Values.length + ')">Usar este precio →</button></div>';
-    } else {
-      suggestedHtml = '<div class="acm-suggested acm-empty">Completa el metraje del inmueble (arriba) para calcular un precio sugerido.</div>';
-    }
-
-    const warningHtml = pm2Values.length < 3
-      ? '<div class="acm-warning">⚠ Con menos de 3 comparables, el precio sugerido es menos confiable.</div>'
-      : '';
-
-    summaryEl.innerHTML =
-      '<div class="acm-stats">' +
-        '<span>Promedio Precio/m²: <b>' + fmt(avg) + '</b></span>' +
-        '<span>Mediana: <b>' + fmt(median) + '</b></span>' +
-        '<span>Mín: <b>' + fmt(min) + '</b></span>' +
-        '<span>Máx: <b>' + fmt(max) + '</b></span>' +
-      '</div>' + warningHtml + suggestedHtml;
-  }
-
-  function usarPrecioAcm(suggested, comparablesCount) {
-    document.getElementById('precioVenta').value = formatAmt(suggested);
-    updateAll();
-    const note = document.getElementById('row-acmSourceNote');
-    const noteText = document.getElementById('acmSourceNoteText');
-    if (note && noteText) {
-      const today = new Date().toLocaleDateString('es-PE');
-      noteText.textContent = 'Precio tomado del ACM el ' + today + ' (promedio de ' + comparablesCount + ' comparable(s)).';
-      note.style.display = '';
-    }
-    showToast('Precio de venta actualizado desde el ACM ✓');
+    try { if (acmIaCandidatos.length) renderAcmIaTabla(); } catch (e) { /* aún cargando */ }
   }
 
   // Estado de la Ficha: para distinguir, de un vistazo, los inmuebles que
@@ -6123,8 +5992,7 @@
     document.getElementById('docsList').innerHTML = '';
     docCounter = 0;
     updateDocsListHeaderVisibility();
-    document.getElementById('acmRows').innerHTML = '';
-    updateAcm();
+    acmComparablesLegado = [];
     document.getElementById('row-acmSourceNote').style.display = 'none';
     acmIaCandidatos = [];
     acmIaNotaTexto = '';
@@ -6140,7 +6008,7 @@
     document.getElementById('acmIaCoefSinTechar').value = '50';
     document.getElementById('acmIaDescuentoNegociacion').value = '6';
     document.getElementById('acmAjusteTamano').checked = true;
-    ['acmIaTipoCambio', 'acmIaValorCochera', 'acmPortalDatos', 'tasacionFecha', 'tasacionValor'].forEach(id => { document.getElementById(id).value = ''; });
+    ['acmIaTipoCambio', 'acmIaValorCochera', 'tasacionFecha', 'tasacionValor'].forEach(id => { document.getElementById(id).value = ''; });
     seedDefaults();
     addPhotoCard(); addPhotoCard(); addPhotoCard();
   }
@@ -6194,9 +6062,7 @@
     docCounter = 0;
     (record.documentos || []).forEach(d => addDocumentoRow(d));
 
-    document.getElementById('acmRows').innerHTML = '';
-    (record.acm_comparables || []).forEach(c => addAcmRow(c));
-    updateAcm();
+    acmComparablesLegado = Array.isArray(record.acm_comparables) ? record.acm_comparables : [];
 
     // Candidatos de la última búsqueda con IA (y la selección que el
     // usuario había marcado) — se restauran y se vuelven a dibujar, pero
@@ -6423,7 +6289,7 @@
       gbancarios_qty: parseNum(document.getElementById('gbancariosQty').value) || null,
       photos: collectPhotos(),
       documentos: collectDocumentos(),
-      acm_comparables: collectAcmRows(),
+      acm_comparables: acmComparablesLegado,
       // Candidatos de la última búsqueda con IA + la selección manual del
       // usuario + sus ajustes (% área sin techar, % negociación) — así al
       // reabrir la ficha se ve exactamente lo mismo, sin repetir la
@@ -7870,6 +7736,7 @@
 
   /* ===== Arranque ===== */
   acmPrepararMarcador();
+  renderAcmEnviados();
   document.getElementById('demoBanner').style.display = DEMO_MODE ? 'block' : 'none';
   if (DEMO_MODE && MOCK_AUTH_STATE === 'signup') {
     showAuthPanel('auth-signup');
