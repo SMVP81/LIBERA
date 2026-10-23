@@ -410,6 +410,14 @@
   .acm-ia-descartados li { margin: 3px 0; word-break: break-all; }
   .acm-ia-noconfiable { background: #FBE4E4; border: 1px solid #E8B4B4; color: #8a1212; border-radius: 7px; padding: 10px 12px; font-size: 11.5px; }
   .acm-ia-noconfiable b { font-size: 13px; }
+  .acm-btn-principal { background: #146C43 !important; color: #fff !important; border-color: #146C43 !important; }
+  .acm-radio-label { font-size: 10.5px; color: #33465e; margin: 0 6px; }
+  .acm-portales { font-size: 10.5px; color: #33465e; margin-top: 8px; }
+  .acm-pegar-aviso { margin-top: 8px; font-size: 10.5px; }
+  .acm-pegar-aviso summary { cursor: pointer; font-weight: bold; color: #1b3a5e; }
+  .acm-pegar-aviso input, .acm-pegar-aviso textarea { width: 100%; box-sizing: border-box; font-size: 10.5px; margin: 5px 0; font-family: inherit; }
+  .acm-ia-lectura { display: block; font-size: 8.5px; color: #1b3a5e; cursor: help; text-decoration: underline dotted; }
+  .acm-radio-label select { font-size: 10.5px; }
   .docs-list-header { display: flex; gap: 8px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; color: #8a95a3; padding: 0 10px; margin-top: 8px; }
   .docs-list-header span:nth-child(1) { flex: 1; min-width: 120px; }
   .docs-list-header span:nth-child(2) { width: 170px; }
@@ -888,26 +896,51 @@
             </table>
           </div>
           <button class="btn-small" onclick="addAcmRow()">+ Agregar comparable</button>
-          <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar comparables con IA</button>
-          <div class="acm-ia-hint">Usa la dirección, distrito, tipo y metraje de arriba. Cada búsqueda tiene un costo pequeño (API de Anthropic) — revisa siempre la fuente de cada candidato antes de usarlo.</div>
+          <button class="btn-small acm-btn-principal" id="btnBuscarAcmCercanos" onclick="buscarCercanosAcm()" title="Avisos vigentes de Babilonia alrededor de la dirección del inmueble, ya verificados y con su distancia">📍 Buscar comparables cercanos (Babilonia · gratis)</button>
+          <label class="acm-radio-label">Radio máximo:
+            <select id="acmRadioMax" onchange="renderAcmIaTabla(); programarAutoguardadoFicha()">
+              <option value="500">500 m</option>
+              <option value="800">800 m</option>
+              <option value="1000" selected>1 km</option>
+              <option value="1500">1.5 km</option>
+            </select>
+          </label>
+          <button class="btn-small" id="btnBuscarAcmIA" onclick="buscarComparablesIA()" title="Busca en la web, con IA, inmuebles comparables cerca de esta dirección">🔎 Buscar también con IA (Urbania/Adondevivir · con costo)</button>
+          <div class="acm-ia-hint" id="acmSujetoInfo"></div>
+          <div class="acm-ia-hint">Usa la dirección (o el link de Google Maps de la ficha, si lo pegaste), el metraje y los dormitorios de arriba. La búsqueda con IA tiene un costo pequeño (API de Anthropic); la de cercanos y la de links pegados son gratis.</div>
           <div class="acm-links-box no-print">
             <label class="acm-subject-title" for="acmLinksPegados">📋 Pegar links de avisos (recomendado · gratis)</label>
             <div class="acm-hint">Busca tú en Urbania, Adondevivir, Babilonia o Remax y pega aquí los links de los avisos (uno por línea, máximo 15). Solo se aceptan avisos de UN inmueble, no páginas de resultados.</div>
             <textarea id="acmLinksPegados" rows="3" placeholder="https://urbania.pe/inmueble/clasificado/...&#10;https://babilonia.pe/inmueble/..."></textarea>
             <button class="btn-small" id="btnValidarLinksAcm" onclick="validarLinksPegadosAcm()">✔ Validar y agregar links</button>
+            <div class="acm-portales">Buscar en los portales (se abren con el distrito de la ficha):
+              <button class="btn-small" onclick="abrirPortalAcm('urbania')">🔗 Urbania</button>
+              <button class="btn-small" onclick="abrirPortalAcm('adondevivir')">🔗 Adondevivir</button>
+              <button class="btn-small" onclick="abrirPortalAcm('babilonia')">🔗 Babilonia</button>
+            </div>
+            <div class="acm-hint">Consejo: ordena por "más recientes" y usa la vista de mapa para quedarte cerca de la dirección.</div>
+            <details class="acm-pegar-aviso">
+              <summary>🧠 Pegar un aviso completo para que la IA lo lea (evita tipear precio y m² · ~1 centavo)</summary>
+              <div class="acm-hint">1) Abre el aviso. 2) Copia su link y pégalo abajo. 3) En la página del aviso presiona Ctrl+A y luego Ctrl+C. 4) Pega el texto abajo y aprieta "Leer aviso". Cada dato que lea la IA trae la frase del aviso de donde salió; lo que no tenga respaldo se borra solo.</div>
+              <input type="text" id="acmAvisoLink" placeholder="Link del aviso (https://urbania.pe/inmueble/clasificado/...)" />
+              <textarea id="acmAvisoTexto" rows="4" placeholder="Pega aquí todo el texto de la página del aviso"></textarea>
+              <button class="btn-small" id="btnLeerAvisoAcm" onclick="leerAvisoPegadoAcm()">🧠 Leer aviso</button>
+            </details>
           </div>
           <div class="acm-summary" id="acmSummary"></div>
 
           <div class="acm-ia-panel no-print" id="acmIaPanel" style="display:none;">
-            <div class="photos-title" style="margin-top:0;">🔎 Comparables (IA y links pegados)</div>
+            <div class="photos-title" style="margin-top:0;">🔎 Comparables (cercanos, IA y links pegados)</div>
             <div class="acm-hint" id="acmIaNota"></div>
             <div class="acm-ia-leyenda">✅ verificado · ⚠️ ábrelo, revisa precio y m² y marca "Vigente" · ❌ no sirve (no entra al cálculo). Solo cuentan los ✅.</div>
             <div class="acm-ia-toolbar">
               <button class="btn-small" onclick="acmIaSeleccionarTodas(true)">Seleccionar todas</button>
               <button class="btn-small" onclick="acmIaSeleccionarTodas(false)">Deseleccionar todas</button>
+              <button class="btn-small" onclick="acmIaLimpiarLista()" title="Quita de la lista los ❌ y los ⚠️ que no marcaste como vigentes">🧹 Quitar ❌ y ⚠️ sin verificar</button>
               <span class="acm-ia-count" id="acmIaCount"></span>
               <label class="acm-ia-sort">Ordenar por:
                 <select id="acmIaOrden" onchange="renderAcmIaTabla()">
+                  <option value="distancia" selected>Distancia</option>
                   <option value="similitud">Similitud</option>
                   <option value="precio">Precio</option>
                   <option value="pm2">S//m² equivalente</option>
@@ -919,7 +952,7 @@
               <table class="acm-table acm-ia-table">
                 <thead>
                   <tr>
-                    <th></th><th>Estado</th><th>Dirección / Zona</th><th>Precio</th><th>Área techada</th><th>Área ocupada</th>
+                    <th></th><th>Estado</th><th>Dirección / Zona</th><th>Distancia</th><th>Precio</th><th>Área techada</th><th>Área ocupada</th>
                     <th>Área equiv.</th><th>S//m² equiv.</th><th>Dorm.</th><th>Baños</th><th>Antigüedad</th>
                     <th>Piso</th><th>Ascensor</th><th>Estac.</th><th>Cercanía</th><th>Publicado</th><th>Similitud</th><th>Fuente</th>
                   </tr>
@@ -1407,8 +1440,20 @@
         return data;
       },
       // Valida links pegados a mano (sin IA, sin costo de API).
-      async validarLinksACM(links) {
-        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: { modo: 'links', links } });
+      async validarLinksACM(links, inmueble) {
+        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: { ...(inmueble || {}), modo: 'links', links } });
+        if (error) throw error;
+        return data;
+      },
+      // Lee con IA (modelo economico) el texto de UN aviso pegado por el usuario.
+      async leerAvisoPegadoACM(link, texto, inmueble) {
+        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: { ...(inmueble || {}), modo: 'texto', link, texto } });
+        if (error) throw error;
+        return data;
+      },
+      // Avisos vigentes de Babilonia alrededor del inmueble (sin IA, sin costo de API).
+      async buscarCercanosACM(inmueble) {
+        const { data, error } = await sb.functions.invoke('acm-search-v2', { body: { ...inmueble, modo: 'cercanos' } });
         if (error) throw error;
         return data;
       },
@@ -1717,6 +1762,29 @@
             { direccion: '(Demo) Residencial El Bosque, mismo distrito', fuente: 'Urbania', link: 'https://ejemplo-demo.pe/aviso-4', precio: 520000, area_techada: 140, area_ocupada: 140, dormitorios: 4, banos: 3, antiguedad: '2 años', piso: '10mo piso', ascensor: 'Sí', estacionamientos: 2, estado_conservacion: 'A estrenar', ubicacion_relativa: 'Aprox. 950 m', similitud: 'bajo' },
           ],
           nota: 'Resultado de EJEMPLO (modo demo) — con Supabase conectado y la llave de Anthropic configurada, aquí aparecerán candidatos reales encontrados en la web, siempre en soles.',
+        };
+      },
+      async leerAvisoPegadoACM(link, texto) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return { version: 2, tipo_cambio: { valor: 3.438, fecha: '(demo)', fuente: 'Demo' }, descartados: [], nota: 'Resultado de EJEMPLO (modo demo).',
+          candidatos: [{ link, origen: 'manual', fuente: 'Demo', direccion: '(Demo) Calle del aviso pegado', moneda: 'USD', precio_original: 260000, area_techada: 110, area_ocupada: 118,
+            dormitorios: 2, banos: 2, antiguedad: '10 años', piso: '4', ascensor: 'Sí', estacionamientos: 1, estado_conservacion: 'bueno', ubicacion_relativa: 'No informado', similitud: 'medio',
+            distancia_m: 420, distancia_tipo: 'aprox', verificacion: 'manual', verificacion_detalle: '(Demo) Datos leídos del aviso que pegaste. Revisa precio y m² y marca "Vigente".',
+            lectura: { precio_original: { valor: 260000, cita: 'USD 260,000' }, area_techada: { valor: 110, cita: '110 m² techados' } } }] };
+      },
+      async buscarCercanosACM(inmueble) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const base = [[253800, 100, 3, 89], [255250, 102, 2, 218], [385000, 120, 3, 240], [242000, 110, 3, 260], [259000, 130, 2, 279], [278000, 130, 2, 343], [380000, 211, 3, 1450]];
+        return {
+          version: 2, tipo_cambio: { valor: 3.438, fecha: '(demo)', fuente: 'Demo' }, radio_max: Number(inmueble.radio_max) || 1000,
+          sujeto: { fuente: 'demo', encontrado: '(Demo) ' + (inmueble.direccion || '') },
+          candidatos: base.map(([pr, ar, dor, d], i) => ({ link: 'https://babilonia.pe/inmueble/demo-aviso-' + (9000 + i), origen: 'cercanos', fuente: 'Babilonia',
+            direccion: '(Demo) Calle cercana ' + (i + 1), moneda: 'USD', precio_original: pr, precio: Math.round(pr * 3.438), area_techada: ar, area_ocupada: null,
+            dormitorios: dor, banos: 2, antiguedad: '8 años', piso: '3', ascensor: 'No informado', estacionamientos: null, estado_conservacion: 'No informado',
+            ubicacion_relativa: 'No informado', similitud: 'medio', distancia_m: d, distancia_tipo: 'exacta', dias_publicado: 40,
+            verificacion: 'verificado', verificacion_detalle: '(Demo) Publicado y vigente en Babilonia.' })),
+          descartados: [{ link: 'https://babilonia.pe/inmueble/demo-viejo-1', motivo: '(Demo) Aviso vencido o dado de baja en Babilonia (estado: expired).' }],
+          nota: 'Resultado de EJEMPLO (modo demo).',
         };
       },
       async validarLinksACM(links) {
@@ -5146,6 +5214,8 @@
       piso: document.getElementById('pisoInmueble').value.trim(),
       ascensor: document.getElementById('ascensorInmueble').value.trim(),
       estacionamientos: document.getElementById('estacionamientosInmueble').value.trim(),
+      link_ubicacion: document.getElementById('linkUbicacion').value.trim(),
+      radio_max: acmRadioMax(),
     };
     if (!inmueble.direccion) {
       alert('Escribe primero la dirección del inmueble (arriba) para poder buscar comparables.');
@@ -5173,6 +5243,84 @@
     }
   }
 
+  function acmRadioMax() {
+    return parseNum(document.getElementById('acmRadioMax').value) || 1000;
+  }
+  function acmDatosInmueble() {
+    const v = id => document.getElementById(id).value.trim();
+    return { direccion: v('direccion'), distrito: v('distrito'), tipo_inmueble: v('tipoInmueble'), metraje: v('metraje'),
+      dormitorios: v('dormitoriosInmueble'), link_ubicacion: v('linkUbicacion'), radio_max: acmRadioMax() };
+  }
+
+  // Distrito de la ficha -> como lo escribe cada portal en sus links (probado el
+  // 23-oct-2026). "San Martin" es San Martin de Porres: en Adondevivir
+  // "san-martin" abre la REGION San Martin, no el distrito.
+  function acmSlugDistrito(distrito) {
+    const n = String(distrito || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const alias = { 'surco': 'santiago-de-surco', 'santiago de surco': 'santiago-de-surco', 'san martin': 'san-martin-de-porres', 'smp': 'san-martin-de-porres',
+      'san martin de porres': 'san-martin-de-porres', 'magdalena del mar': 'magdalena', 'cercado': 'lima', 'cercado de lima': 'lima' };
+    return alias[n] || n.replace(/[^a-z0-9 ]/g, '').replace(/ /g, '-');
+  }
+  function acmUrlPortal(portal, distrito, tipo, dormitorios) {
+    const slug = acmSlugDistrito(distrito);
+    const casa = /casa/i.test(tipo || '');
+    const dorm = parseNum(dormitorios);
+    if (portal === 'urbania') return 'https://urbania.pe/buscar/venta-de-' + (casa ? 'casas' : 'departamentos') + (slug ? '-en-' + slug + '--lima--lima' : '');
+    if (portal === 'adondevivir') return 'https://www.adondevivir.com/' + (casa ? 'casas' : 'departamentos') + '-en-venta' + (slug ? '-en-' + slug : '') + (dorm > 0 && dorm < 6 ? '-con-' + dorm + '-dormitorios' : '') + '-ordenado-por-fechaonline-descendente.html';
+    return 'https://babilonia.pe/inmuebles/' + (casa ? 'casas' : 'departamentos') + '-en-venta' + (slug ? '/' + slug : '');
+  }
+  function abrirPortalAcm(portal) {
+    const url = acmUrlPortal(portal, document.getElementById('distrito').value, document.getElementById('tipoInmueble').value, document.getElementById('dormitoriosInmueble').value);
+    window.open(url, '_blank', 'noopener');
+  }
+
+  // Aviso pegado: la IA lee precio, m², etc. del texto que el usuario copió de
+  // la página del aviso. Cada dato debe venir con una frase que exista tal cual
+  // en el texto (lo controla la Edge Function); el usuario igual revisa y marca "Vigente".
+  async function leerAvisoPegadoAcm() {
+    const link = document.getElementById('acmAvisoLink').value.trim();
+    const texto = document.getElementById('acmAvisoTexto').value;
+    const cl = acmClasificarLink(link);
+    if (!cl.ok) { showToast('Pega el link de UN aviso (no una página de resultados): ' + cl.motivo); return; }
+    if (texto.trim().length < 150) { showToast('Falta el texto: en la página del aviso presiona Ctrl+A, luego Ctrl+C, y pégalo aquí.'); return; }
+    const btn = document.getElementById('btnLeerAvisoAcm');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Leyendo…';
+    try {
+      const resultado = await db.leerAvisoPegadoACM(link, texto, acmDatosInmueble());
+      if (resultado && resultado.error) { showToast(resultado.error); return; }
+      const n = acmIaAplicarRespuesta(resultado, 'texto');
+      document.getElementById('acmAvisoLink').value = '';
+      document.getElementById('acmAvisoTexto').value = '';
+      showToast(n ? 'Aviso leído ✓ Revisa los datos y marca "Vigente".' : (((resultado && resultado.descartados) || [])[0] || {}).motivo || 'No se pudo usar ese aviso.');
+    } catch (e) {
+      showToast('No se pudo leer el aviso: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
+  }
+
+  // Comparables cercanos: avisos VIGENTES de Babilonia alrededor del inmueble,
+  // ya verificados y con su distancia exacta. Gratis (no usa la IA).
+  async function buscarCercanosAcm() {
+    const inmueble = acmDatosInmueble();
+    if (!inmueble.direccion && !inmueble.link_ubicacion) { alert('Escribe primero la dirección del inmueble (o pega su link de Google Maps).'); return; }
+    if (!(parseNum(inmueble.metraje) > 0)) { alert('Completa el metraje del inmueble para buscar departamentos de tamaño parecido.'); return; }
+    const btn = document.getElementById('btnBuscarAcmCercanos');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Buscando cerca…';
+    try {
+      const resultado = await db.buscarCercanosACM(inmueble);
+      if (resultado && resultado.error) { showToast(resultado.error); return; }
+      const n = acmIaAplicarRespuesta(resultado, 'cercanos');
+      showToast(n ? n + ' comparable(s) cercano(s) encontrado(s).' : 'No se encontraron avisos vigentes parecidos dentro del radio: prueba con un radio mayor o pega links.');
+    } catch (e) {
+      showToast('No se pudo completar la búsqueda: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
+  }
+
   // Links pegados a mano: se validan con las mismas reglas (formato de aviso
   // individual, aviso vigente en Babilonia, tipo de cambio del día), sin IA
   // ni costo de API. Se AGREGAN a la lista actual, no la reemplazan.
@@ -5185,7 +5333,7 @@
     const original = btn.textContent;
     btn.disabled = true; btn.textContent = 'Validando…';
     try {
-      const resultado = await db.validarLinksACM(links);
+      const resultado = await db.validarLinksACM(links, acmDatosInmueble());
       if (resultado && resultado.error) { showToast('No se pudieron validar: ' + resultado.error); return; }
       const nuevos = acmIaAplicarRespuesta(resultado, 'links');
       ta.value = '';
@@ -5210,6 +5358,7 @@
   let acmIaDescartados = [];
   let acmIaTipoCambioInfo = null;
   let acmIaUltimoResultado = null;
+  let acmIaSujetoInfo = null;
   const ACM_VERSION = 2;
   const ACM_MIN_COMPARABLES = 5;
   const ACM_EXTREMO = 0.20;          // ±20% de la mediana = extremo, sale del cálculo
@@ -5222,10 +5371,11 @@
   // el 23-oct-2026). Se repite aquí para clasificar también lo guardado antes
   // de la v2 — esos links salen ❌ si no son de un aviso individual.
   const ACM_PORTALES = [
-    { id: 'urbania', nombre: 'Urbania', host: /(^|\.)urbania\.pe$/i, aviso: /^\/inmueble\/clasificado\/[a-z0-9-]+-(\d{7,})(\.html)?\/?$/i, proyecto: /^\/inmueble\/proyecto\//i },
-    { id: 'adondevivir', nombre: 'Adondevivir', host: /(^|\.)adondevivir\.com$/i, aviso: /^\/propiedades\/clasificado\/[a-z0-9-]+-(\d{7,})\.html\/?$/i, proyecto: /^\/propiedades\/proyecto\//i },
-    { id: 'babilonia', nombre: 'Babilonia', host: /(^|\.)babilonia\.pe$/i, aviso: /^\/inmueble\/[a-z0-9-]+-(\d{3,})\/?$/i, proyecto: /^\/proyecto/i },
-    { id: 'remax', nombre: 'Remax', host: /(^|\.)remax\.pe$/i, aviso: /^\/propiedad-[a-z0-9+-]+-(\d{4,})\/?$/i, proyecto: /^\/proyecto/i },
+    // Los links reales pueden traer signos como ":" (Adondevivir, 23-oct-2026).
+    { id: 'urbania', nombre: 'Urbania', host: /(^|\.)urbania\.pe$/i, aviso: /^\/inmueble\/clasificado\/[^/]+-(\d{7,})(\.html)?\/?$/i, proyecto: /^\/inmueble\/proyecto\//i },
+    { id: 'adondevivir', nombre: 'Adondevivir', host: /(^|\.)adondevivir\.com$/i, aviso: /^\/propiedades\/clasificado\/[^/]+-(\d{7,})\.html\/?$/i, proyecto: /^\/propiedades\/proyecto\//i },
+    { id: 'babilonia', nombre: 'Babilonia', host: /(^|\.)babilonia\.pe$/i, aviso: /^\/inmueble\/[^/]+-(\d{3,})\/?$/i, proyecto: /^\/proyecto/i },
+    { id: 'remax', nombre: 'Remax', host: /(^|\.)remax\.pe$/i, aviso: /^\/propiedad-[^/]+-(\d{4,})\/?$/i, proyecto: /^\/proyecto/i },
   ];
   function acmClasificarLink(link) {
     let u;
@@ -5250,13 +5400,24 @@
   }
 
   // ✅ ok · ⚠️ manual · ❌ malo
+  function acmFmtDist(m) {
+    return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m';
+  }
   function acmIaEstado(c) {
     const cl = acmClasificarLink(c.link);
     if (!cl.ok) return { nivel: 'malo', texto: cl.motivo };
+    // Fuera del radio: con distancia exacta (ubicación del aviso) se aplica el
+    // radio tal cual; con distancia aproximada (por dirección) se da 50% de margen.
+    if (c.distancia_m != null) {
+      const radio = acmRadioMax();
+      const lim = c.distancia_tipo === 'aprox' ? radio * 1.5 : radio;
+      if (c.distancia_m > lim) return { nivel: 'malo', texto: 'A ' + (c.distancia_tipo === 'aprox' ? '≈ ' : '') + acmFmtDist(c.distancia_m) + ' del inmueble: fuera del radio de ' + acmFmtDist(radio) + '.' };
+    }
     if (c.verificacion === 'verificado') return { nivel: 'ok', texto: c.verificacion_detalle || 'Verificado automáticamente.' };
     if (c._vigente) return { nivel: 'ok', texto: 'Verificado a mano' + (c._vigente_fecha ? ' el ' + c._vigente_fecha : '') + '.' };
-    if (!c.verificacion) return { nivel: 'manual', texto: 'De una búsqueda anterior a la verificación: ábrelo, revisa precio y m² y marca "Vigente".' };
-    return { nivel: 'manual', texto: c.verificacion_detalle || 'Ábrelo, revisa precio y m² y marca "Vigente".' };
+    const cerca = c.distancia_m == null ? ' Confirma también que está a menos de ' + acmFmtDist(acmRadioMax()) + ' del inmueble.' : '';
+    if (!c.verificacion) return { nivel: 'manual', texto: 'De una búsqueda anterior a la verificación: ábrelo, revisa precio y m² y marca "Vigente".' + cerca };
+    return { nivel: 'manual', texto: (c.verificacion_detalle || 'Ábrelo, revisa precio y m² y marca "Vigente".') + cerca };
   }
 
   // Moneda que muestra la fila: lo guardado antes de la v2 no tiene moneda
@@ -5300,12 +5461,18 @@
       acmIaTipoCambioInfo = resultado.tipo_cambio;
       document.getElementById('acmIaTipoCambio').value = resultado.tipo_cambio.valor;
     }
-    if (origen === 'ia') {
+    if (resultado && resultado.sujeto) acmIaSujetoInfo = resultado.sujeto;
+    if (origen === 'ia' || origen === 'cercanos') {
       acmIaNotaTexto = (resultado && resultado.nota) || '';
-      // Una búsqueda nueva con IA reemplaza lo que vino de la IA, pero nunca
-      // los links pegados a mano ni sus verificaciones.
-      acmIaCandidatos = acmIaCandidatos.filter(c => c.origen === 'manual');
-      acmIaDescartados = acmIaDescartados.filter(d => d.origen === 'manual');
+      // Una búsqueda nueva reemplaza lo que vino de ESA misma búsqueda, pero
+      // nunca los links pegados a mano, lo de la otra búsqueda ni las
+      // verificaciones hechas a mano. (Lo guardado antes de la v2.1 sin
+      // "origen" se trata como de la IA.)
+      const mismo = c => (c.origen || 'ia') === origen;
+      acmIaCandidatos = acmIaCandidatos.filter(c => !mismo(c) || c._vigente);
+      acmIaDescartados = acmIaDescartados.filter(d => !mismo(d));
+    } else if (resultado && resultado.nota) {
+      acmIaNotaTexto = resultado.nota;
     }
     const claveDe = c => acmClasificarLink(c.link).clave || c.link;
     // Un link que el sistema acaba de descartar (p.ej. aviso vencido) sale de
@@ -5320,19 +5487,19 @@
         // Ya estaba: si ahora viene verificado por el sistema, reemplaza a la
         // fila anterior (sin verificar), conservando si estaba seleccionada.
         const i = acmIaCandidatos.findIndex(x => claveDe(x) === clave);
-        if (i >= 0 && c.verificacion === 'verificado' && acmIaCandidatos[i].verificacion !== 'verificado') {
-          acmIaCandidatos[i] = { ...c, origen: acmIaCandidatos[i].origen || 'manual', _selected: true };
+        if (i >= 0 && ((c.verificacion === 'verificado' && acmIaCandidatos[i].verificacion !== 'verificado') || (origen === 'texto' && c.lectura))) {
+          acmIaCandidatos[i] = { ...c, origen: origen === 'texto' ? 'manual' : (acmIaCandidatos[i].origen || 'manual'), _selected: true };
           nuevos++;
         }
         return;
       }
       claves.add(clave);
-      const fila = { ...c, origen: origen === 'links' ? 'manual' : (c.origen || 'ia') };
+      const fila = { ...c, origen: (origen === 'links' || origen === 'texto') ? 'manual' : origen };
       fila._selected = acmIaEstado(fila).nivel !== 'malo' && fila.similitud !== 'bajo';
       acmIaCandidatos.push(fila);
       nuevos++;
     });
-    descartados.forEach(d => acmIaDescartados.push({ ...d, origen: origen === 'links' ? 'manual' : 'ia' }));
+    descartados.forEach(d => acmIaDescartados.push({ ...d, origen: (origen === 'links' || origen === 'texto') ? 'manual' : origen }));
     if (!acmIaCandidatos.length && !acmIaDescartados.length) {
       showToast((resultado && resultado.nota) || 'No se encontraron candidatos confiables.');
       document.getElementById('acmIaPanel').style.display = 'none';
@@ -5405,6 +5572,7 @@
     const ordenados = [...calculados].sort((a, b) => {
       const n = rangoNivel[a._estado.nivel] - rangoNivel[b._estado.nivel];
       if (n !== 0) return n;
+      if (orden === 'distancia') return (a.distancia_m ?? Infinity) - (b.distancia_m ?? Infinity);
       if (orden === 'precio') return (a._precioS ?? Infinity) - (b._precioS ?? Infinity);
       if (orden === 'pm2') return (a._pm2Equiv ?? Infinity) - (b._pm2Equiv ?? Infinity);
       if (orden === 'ubicacion') return acmIaRankCercania(a.ubicacion_relativa) - acmIaRankCercania(b.ubicacion_relativa);
@@ -5434,13 +5602,16 @@
         ? '<input class="acm-ia-edit" type="text" value="' + (v != null ? v : '') + '" onchange="acmIaEditar(' + i + ',\'' + campo + '\',this.value)" />'
         : (v != null ? acmEsc(v) + (suf || '') : 'No informado');
       const vigente = (nivel === 'manual' || (nivel === 'ok' && c.verificacion !== 'verificado'))
-        ? '<label class="acm-ia-vigente"><input type="checkbox" ' + (c._vigente ? 'checked' : '') + ' onchange="acmIaMarcarVigente(' + i + ', this.checked)" /> Vigente</label>' : '';
+        ? '<label class="acm-ia-vigente"><input type="checkbox" ' + (c._vigente ? 'checked' : '') + ' onchange="acmIaMarcarVigente(' + i + ', this.checked)" /> ' + (c.distancia_m == null ? 'Vigente y cerca' : 'Vigente') + '</label>' : '';
       const publicado = c.dias_publicado != null ? 'hace ' + c.dias_publicado + ' d' : '—';
       return (
         '<tr class="acm-ia-row is-' + nivel + (c._outlier ? ' is-outlier' : '') + (c._selected ? '' : ' is-unselected') + '">' +
         '<td class="acm-ia-check"><input type="checkbox" ' + (c._selected ? 'checked' : '') + (nivel === 'malo' ? ' disabled' : '') + ' onchange="acmIaToggleRow(' + i + ', this.checked)" /></td>' +
-        '<td class="acm-ia-estado-cell"><span class="acm-ia-estado" title="' + acmEsc(c._estado.texto) + '">' + ICONO[nivel] + '</span><span class="acm-ia-estado-txt">' + acmEsc(c._estado.texto) + '</span>' + vigente + '</td>' +
+        '<td class="acm-ia-estado-cell"><span class="acm-ia-estado" title="' + acmEsc(c._estado.texto) + '">' + ICONO[nivel] + '</span><span class="acm-ia-estado-txt">' + acmEsc(c._estado.texto) + '</span>' +
+          (c.lectura && Object.keys(c.lectura).length ? '<span class="acm-ia-lectura" title="' + acmEsc(Object.entries(c.lectura).map(([k, v]) => k.replace(/_/g, ' ') + ': ' + v.valor + '  ←  «' + v.cita + '»').join('\n')) + '">📄 datos leídos por la IA (pasa el mouse)</span>' : '') +
+          vigente + '</td>' +
         '<td>' + (c.direccion ? acmEsc(c.direccion) : '—') + '</td>' +
+        '<td>' + (c.distancia_m != null ? (c.distancia_tipo === 'aprox' ? '≈ ' : '') + acmFmtDist(c.distancia_m) : '<span title="Sin ubicación: confírmalo al abrir el aviso">—</span>') + '</td>' +
         '<td>' + precioCell + '</td>' +
         '<td>' + numCell('area_techada', c.area_techada, ' m²') + '</td>' +
         '<td>' + (c.area_ocupada != null ? acmEsc(c.area_ocupada) + ' m²' : 'No informado') + '</td>' +
@@ -5461,6 +5632,8 @@
     }).join('');
 
     document.getElementById('acmIaNota').textContent = acmIaNotaTexto || '';
+    const suj = document.getElementById('acmSujetoInfo');
+    if (suj) suj.textContent = acmIaSujetoInfo ? '📍 Inmueble ubicado en el mapa como: ' + (acmIaSujetoInfo.encontrado || 'el link de Google Maps de la ficha') + ' (' + acmIaSujetoInfo.fuente + '). Si no es correcto, pega el link de Google Maps en "Link de ubicación".' : '';
     const tcInfo = document.getElementById('acmIaTipoCambioFuente');
     if (tcInfo) tcInfo.textContent = acmIaTipoCambioInfo ? (acmIaTipoCambioInfo.fuente + ', ' + acmIaTipoCambioInfo.fecha) : '';
     const box = document.getElementById('acmIaDescartadosBox');
@@ -5525,6 +5698,18 @@
     if (c._vigente && campo !== 'estacionamientos') { c._vigente = false; c._vigente_fecha = null; }
     renderAcmIaTabla();
     programarAutoguardadoFicha();
+  }
+
+  function acmIaLimpiarLista() {
+    const antes = acmIaCandidatos.length;
+    acmIaCandidatos.forEach(c => {
+      const e = acmIaEstado(c);
+      if (e.nivel !== 'ok') acmIaDescartados.push({ link: c.link, motivo: 'Quitado de la lista: ' + e.texto, origen: c.origen || 'ia' });
+    });
+    acmIaCandidatos = acmIaCandidatos.filter(c => acmIaEstado(c).nivel === 'ok');
+    renderAcmIaTabla();
+    programarAutoguardadoFicha();
+    showToast((antes - acmIaCandidatos.length) + ' quitado(s) de la lista (quedan en "descartados").');
   }
 
   function acmIaSeleccionarTodas(flag) {
@@ -5834,6 +6019,9 @@
     acmIaDescartados = [];
     acmIaTipoCambioInfo = null;
     acmIaUltimoResultado = null;
+    acmIaSujetoInfo = null;
+    document.getElementById('acmRadioMax').value = '1000';
+    document.getElementById('acmSujetoInfo').textContent = '';
     document.getElementById('acmIaPanel').style.display = 'none';
     document.getElementById('acmIaRows').innerHTML = '';
     document.getElementById('acmIaResultado').innerHTML = '';
@@ -5911,6 +6099,9 @@
       acmIaNotaTexto = acmIa.nota || '';
       acmIaDescartados = acmIa.descartados || [];
       acmIaTipoCambioInfo = acmIa.tipo_cambio_info || null;
+      acmIaSujetoInfo = acmIa.sujeto || null;
+      document.getElementById('acmRadioMax').value = String(acmIa.radio_max || 1000);
+      if (!document.getElementById('acmRadioMax').value) document.getElementById('acmRadioMax').value = '1000';
       document.getElementById('acmIaCoefSinTechar').value = !isEmpty(acmIa.coef_sin_techar) ? acmIa.coef_sin_techar : 50;
       document.getElementById('acmIaDescuentoNegociacion').value = !isEmpty(acmIa.descuento_negociacion) ? acmIa.descuento_negociacion : 6;
       // Fichas de antes de la v2 no tienen tipo de cambio guardado: queda
@@ -5924,6 +6115,9 @@
       acmIaNotaTexto = '';
       acmIaDescartados = [];
       acmIaTipoCambioInfo = null;
+      acmIaSujetoInfo = null;
+      document.getElementById('acmRadioMax').value = '1000';
+      document.getElementById('acmSujetoInfo').textContent = '';
       document.getElementById('acmIaTipoCambio').value = '';
       document.getElementById('acmIaValorCochera').value = '';
       document.getElementById('acmIaPanel').style.display = 'none';
@@ -6129,6 +6323,8 @@
         tipo_cambio: parseNum(document.getElementById('acmIaTipoCambio').value) || null,
         tipo_cambio_info: acmIaTipoCambioInfo,
         valor_cochera: parseNum(document.getElementById('acmIaValorCochera').value) || null,
+        radio_max: acmRadioMax(),
+        sujeto: acmIaSujetoInfo,
         // Foto del último cálculo (fecha, comparables, valores) — queda como
         // registro aunque después cambien los avisos.
         resultado: acmIaUltimoResultado,
