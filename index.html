@@ -3606,6 +3606,7 @@
   // mano). Los campos "Estimado" del proyecto se pueden seguir editando a
   // mano después — esto solo los deja al día en el momento de guardar la
   // Ficha, no bloquea la edición.
+  const cfAvisoProyectoCreado = {};
   async function cfAutoSyncEstimadoDesdeFicha(fichaId, fichaRecord) {
     try {
       const valores = fichaValoresEstimados(fichaRecord);
@@ -3615,12 +3616,23 @@
       let vinculados;
       if (yaCargados) {
         vinculados = cfProyectos.filter(p => p.ficha_id === fichaId);
+        // Al pasar a "Comprado", la base crea sola el proyecto (trigger
+        // crear_proyecto_al_comprar): todavía no está en memoria, se busca en la base.
+        if (!vinculados.length && fichaRecord.estado === 'Comprado') {
+          const todos = await db.listProyectosFinancieros();
+          const nuevos = todos.filter(p => p.ficha_id === fichaId && !cfProyectos.some(x => x.id === p.id));
+          cfProyectos.push(...nuevos);
+          vinculados = nuevos;
+        }
       } else {
         // Control Financiero no se ha abierto todavía en esta sesión —
         // consultamos directo a la base para no perdernos proyectos vinculados.
         const todos = await db.listProyectosFinancieros();
         vinculados = todos.filter(p => p.ficha_id === fichaId);
       }
+      // Aviso cuando el proyecto lo acaba de crear la base (en los últimos 10 minutos).
+      const recien = vinculados.find(p => fichaRecord.estado === 'Comprado' && p.created_at && (Date.now() - Date.parse(p.created_at)) < 10 * 60000 && !cfAvisoProyectoCreado[p.id]);
+      if (recien) { cfAvisoProyectoCreado[recien.id] = true; showToast('Se creó el proyecto «' + recien.nombre + '» en Control Financiero (En venta) ✓'); }
       for (const p of vinculados) {
         await cfPersistProyecto(p.id, valores);
       }
